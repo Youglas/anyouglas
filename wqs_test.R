@@ -15,7 +15,7 @@ data_female <- subset(data,data$d.sex=="Female")
 data_male <- subset(data,data$d.sex=="Male")
 name2 <- names(data_female)[1:9]
 name3 <- names(data_male)[1:9]
-#???
+#female
 results2=gwqs(d.low.muscle ~ wqs +d.age+d.eth+d.edu+d.marital+d.BMI_kg.m2+
                 d.PIR+d.vitaminD+d.smoke+d.alcohol.user+d.PA_total_MET, 
               mix_name = name3, data = data_female, q = 4, validation = 0.6,b = 1000, 
