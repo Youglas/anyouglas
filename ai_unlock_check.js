@@ -2,7 +2,7 @@
 ================================================================
 ai_unlock_check.js — Quantumult X 检测主流 AI 是否已解锁
 @Author: Tuesday
-@Date: 2026-11-01 (v2: 界面美化，状态徽章 + 汇总卡片)
+@Date: 2026-11-01 (v3: 界面美化，QX 原生标签渲染：大字汇总、彩色状态、分隔线；逻辑同 v1)
 @Description:
 检测当前出口 IP（所选策略/节点）能否打开主流 AI 服务。
 每个服务并行检测，7 秒超时，总时长约 8 秒，不会
@@ -248,25 +248,24 @@ const plainLines = results.map(function (r) {
 return ICONS[r.status] + ' ' + r.name + '：' + LABELS[r.status] + '（' + r.detail + '）';
 });
 const footer = okCount + '/' + results.length + ' 已解锁 · ' + secs + 's' + (policy? ' · ' + policy: '');
-const BADGES = {
-ok: '<span style="background:#E6F4EA; color:#137333; padding:3px 10px; border-radius:12px; font-size:13px; font-weight:700">✅ 已解锁</span>',
-blocked: '<span style="background:#FCE8E6; color:#A50E0E; padding:3px 10px; border-radius:12px; font-size:13px; font-weight:700">❌ 未解锁</span>',
-timeout: '<span style="background:#FEF7E0; color:#B06000; padding:3px 10px; border-radius:12px; font-size:13px; font-weight:700">⏱️ 超时</span>',
-unknown: '<span style="background:#F2F2F7; color:#666666; padding:3px 10px; border-radius:12px; font-size:13px; font-weight:700">❓ 未知</span>'
-};
+const COLORS = { ok: '#137333', blocked: '#A50E0E', timeout: '#B06000', unknown: '#666666' };
 const rows = results.map(function (r) {
-return '<tr><td style="padding:9px 0; border-bottom:1px solid #E5E5EA"><b>' + r.name + '</b><div style="font-size:12px; color:#8E8E93; margin-top:2px">' + r.detail + '</div></td><td style="text-align:right; padding:9px 0; border-bottom:1px solid #E5E5EA">' + BADGES[r.status] + '</td></tr>';
-}).join('');
-const html = '<div style="font-family:-apple-system; padding:2px">'
-+ '<div style="background:#5856D6; background:linear-gradient(135deg,#5856D6,#AF52DE); border-radius:18px; padding:18px 16px; text-align:center; color:#FFFFFF">'
-+ '<div style="font-size:12px; letter-spacing:3px; opacity:0.85">🤖 AI 解 锁 检 测</div>'
-+ '<div style="font-size:42px; font-weight:800; line-height:1.2">' + okCount + '<span style="font-size:22px; color:#E5E5EA"> / ' + results.length + '</span></div>'
-+ '<div style="font-size:13px; opacity:0.9">项服务已解锁</div>'
-+ '</div></br>'
-+ '<table style="width:100%; font-size:15px; border-collapse:collapse">' + rows + '</table>'
-+ '<div style="text-align:center; padding:10px 0 2px; font-size:13px; color:#8E8E93">' + footer + '</div>'
-+ '<div style="text-align:center; font-size:12px; color:#AEAEB2">仅测当前出口 IP 能否打开服务，不代表账号能登录</div>'
-+ '</div>';
+return '<b>' + r.name + '</b>　<font color="' + COLORS[r.status] + '"><b>' + ICONS[r.status] + ' ' + LABELS[r.status] + '</b></font></br><font color="#8E8E93" size="2">' + r.detail + '</font>';
+}).join('</br></br>');
+const html = '<p style="text-align: center; font-family: -apple-system; font-size: large">'
++ '<b><font color="#5856D6">🤖 AI 解锁检测</font></b> <font color="#AEAEB2" size="2">v3</font></br>'
++ '──────────────────────</br>'
++ '<font color="#5856D6"><span style="font-size:42px; font-weight:bold">' + okCount + ' / ' + results.length + '</span></font></br>'
++ '<font color="#8E8E93">项服务已解锁</font></br>'
++ '──────────────────────</br></p>'
++ '<p style="text-align: left; font-family: -apple-system; font-size: large">'
++ rows
++ '</p>'
++ '<p style="text-align: center; font-family: -apple-system; font-size: large">'
++ '──────────────────────</br>'
++ '<font color="#8E8E93">' + footer + '</font></br>'
++ '<font color="#AEAEB2" size="2">仅测当前出口 IP 能否打开服务，不代表账号能登录</font>'
++ '</p>';
 const plain = plainLines.join('\n') + '\n' + footer;
 log(NAME + ' | ' + plain);
 if (typeof $done!== 'undefined') {
