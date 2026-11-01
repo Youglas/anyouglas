@@ -2,7 +2,7 @@
 ================================================================
 ai_unlock_check.js — Quantumult X 检测主流 AI 是否已解锁
 @Author: Tuesday
-@Date: 2026-11-01 (v6: 逻辑同 v1，界面按流媒体服务查询弹窗样式：居中、粗体、虚线分隔、红色节点脚注、🎉/🚫/🚦/❗、⇢ [国旗])
+@Date: 2026-11-01 (v7: 逻辑同 v1，新增 11 个检测：Muse、DeepSeek、Kimi、Qwen、豆包、Poe、Character.AI、You.com、HuggingChat、智谱清言、文心一言；界面同 v6)
 @Description:
 检测当前出口 IP（所选策略/节点）能否打开主流 AI 服务。
 每个服务并行检测，7 秒超时，总时长约 8 秒，不会
@@ -36,7 +36,11 @@ https://api.x.ai/v1/models 401 "No credentials" = 已解锁。
 - Mistral Le Chat：chat.mistral.ai 首页 200 = 已解锁。
 注意：只测“出口 IP 能否打开服务”，不代表账号
 能注册/登录（手机号、支付、账号风控另算）。Meta AI
-未列入：首页返回人机验证 403，脚本无法判断。
+（meta.ai）未列入：首页返回人机验证 403，脚本无法判断，
+沙箱实测连美国出口也一样；Muse 列入的是 muse.ai，
+与 meta.ai 是不同入口。新增的国产 AI（DeepSeek、Kimi、
+Qwen、豆包、智谱、文心）多为“可达性”检测：首页
+200 不代表注册/登录一定能用，地区限制主要看账号侧。
 
 手动点测（固定 commit 地址，绕过 QX
 24 小时远程缓存）：
@@ -159,6 +163,7 @@ if (loc && CLAUDE_BLOCKED.indexOf(loc) > -1) return { status: 'blocked', detail:
 if (isBlockedText(home.body)) return { status: 'blocked', detail: loc || '地区受限'};
 if (loc) return { status: 'ok', detail: '出口 ' + loc};
 if (home.status === 200) return { status: 'ok', detail: 'HTTP 200'};
+if (home.status >= 300 && home.status < 400) return { status: 'ok', detail: 'HTTP ' + home.status + '（跳转）'};
 if (home.error === 'timeout') return { status: 'timeout', detail: '超时'};
 return { status: 'unknown', detail: home.error || ('HTTP ' + home.status)};
 }
@@ -194,6 +199,7 @@ const r = await httpGet(url, TIMEOUT_MS);
 if (r.error === 'timeout') return { status: 'timeout', detail: '超时'};
 if (isBlockedText(r.body)) return { status: 'blocked', detail: '地区受限'};
 if (r.status === 200 && r.body) return { status: 'ok', detail: 'HTTP 200'};
+if (r.status >= 300 && r.status < 400) return { status: 'ok', detail: 'HTTP ' + r.status + '（跳转）'};
 if (r.status === 403) return { status: 'blocked', detail: 'HTTP 403'};
 if (r.status) return { status: 'unknown', detail: 'HTTP ' + r.status};
 return { status: 'unknown', detail: r.error || '无响应'};
@@ -215,6 +221,22 @@ return { status: 'unknown', detail: home.error || '无响应'};
 }
 
 
+async function checkDeepSeek() {
+const results = await Promise.all([
+httpGet('https://www.deepseek.com/', TIMEOUT_MS),
+httpGet('https://chat.deepseek.com/', TIMEOUT_MS)
+]);
+const home = results[0];
+const chat = results[1];
+if (isBlockedText(home.body) || isBlockedText(chat.body)) return { status: 'blocked', detail: '地区受限'};
+if (home.status === 200 && home.body) return { status: 'ok', detail: 'HTTP 200'};
+if (chat.status === 200 || chat.status === 202) return { status: 'ok', detail: '对话页 HTTP ' + chat.status};
+if (home.error === 'timeout' && chat.error === 'timeout') return { status: 'timeout', detail: '超时'};
+if (home.status) return { status: 'unknown', detail: 'HTTP ' + home.status};
+return { status: 'unknown', detail: home.error || chat.error || '无响应'};
+}
+
+
 const FLAGS = { US: '🇺🇸', JP: '🇯🇵', SG: '🇸🇬', HK: '🇭🇰', TW: '🇨🇳', GB: '🇬🇧', DE: '🇩🇪', FR: '🇫🇷', NL: '🇳🇱', KR: '🇰🇷', AU: '🇦🇺', CA: '🇨🇦', CH: '🇨🇭', IT: '🇮🇹', ES: '🇪🇸', IN: '🇮🇳', BR: '🇧🇷', MX: '🇲🇽', ID: '🇮🇩', MY: '🇲🇾', TH: '🇹🇭', VN: '🇻🇳', PH: '🇵🇭', NZ: '🇳🇿', SE: '🇸🇪', NO: '🇳🇴', DK: '🇩🇰', FI: '🇫🇮', IE: '🇮🇪', AT: '🇦🇹', BE: '🇧🇪', PL: '🇵🇱', TR: '🇹🇷', AE: '🇦🇪', ZA: '🇿🇦', AR: '🇦🇷', CL: '🇨🇱' };
 function flagFor(detail) {
 var m = detail ? detail.match(/\b([A-Z]{2})\b/) : null;
@@ -230,7 +252,18 @@ const CHECKS = [
 { name: 'Grok', fn: checkGrok},
 { name: 'Copilot', fn: function () { return checkHomepage('Copilot', 'https://copilot.microsoft.com/');}},
 { name: 'Perplexity', fn: function () { return checkHomepage('Perplexity', 'https://www.perplexity.ai/');}},
-{ name: 'Mistral', fn: function () { return checkHomepage('Mistral', 'https://chat.mistral.ai/');}}
+{ name: 'Mistral', fn: function () { return checkHomepage('Mistral', 'https://chat.mistral.ai/');}},
+{ name: 'Muse', fn: function () { return checkHomepage('Muse', 'https://muse.ai/');}},
+{ name: 'DeepSeek', fn: checkDeepSeek},
+{ name: 'Kimi', fn: function () { return checkHomepage('Kimi', 'https://www.kimi.com/');}},
+{ name: 'Qwen', fn: function () { return checkHomepage('Qwen', 'https://chat.qwen.ai/');}},
+{ name: '豆包', fn: function () { return checkHomepage('Doubao', 'https://www.doubao.com/chat/');}},
+{ name: 'Poe', fn: function () { return checkHomepage('Poe', 'https://poe.com/');}},
+{ name: 'Character.AI', fn: function () { return checkHomepage('Character.AI', 'https://character.ai/');}},
+{ name: 'You.com', fn: function () { return checkHomepage('You.com', 'https://you.com/');}},
+{ name: 'HuggingChat', fn: function () { return checkHomepage('HuggingChat', 'https://huggingface.co/chat');}},
+{ name: '智谱清言', fn: function () { return checkHomepage('ChatGLM', 'https://chatglm.cn/');}},
+{ name: '文心一言', fn: function () { return checkHomepage('Wenxin', 'https://yiyan.baidu.com/');}}
 ];
 
 const ICONS = { ok: '✅', blocked: '❌', timeout: '⏱️', unknown: '❓'};
