@@ -2,7 +2,7 @@
 ================================================================
 fast_speedtest.js — Quantumult X 用 fast.com 测当前节点下载 + 上传
 @Author: Tuesday
-@Date: 2026-11-01 (v4: 测得准优先 + 加上传 + 简洁界面)
+@Date: 2026-11-01 (v5: 工作线程持续下载，逼近网页版)
 @Description:
 fast.com 网页版的算法（从 fast.com/app-*.js 实测）：
 duration min 5s / max 30s，连接数随速度自适应到 8，
@@ -40,8 +40,9 @@ https://cdn.jsdelivr.net/gh/Youglas/anyouglas@master/fast_speedtest.js, tag=Fast
 const NAME = 'Fast.com 测速';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const FALLBACK_TOKEN = 'YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm';
-const CONCURRENCY = 4;
-const WARMUP_BYTES = 5 * 1048576;
+const CONCURRENCY = 6;
+const WARMUP_BYTES = 10 * 1048576;
+const WORKER_DURATION_MS = 12000;
 const MIN_BYTES = 5 * 1048576;
 const MAX_BYTES = 15 * 1048576;
 const ROUND_TARGET_SEC = 3.0;
@@ -50,7 +51,7 @@ const MAIN_ROUNDS = 3;
 const UP_MIN_BYTES = 1048576;
 const UP_MAX_BYTES = 5 * 1048576;
 const UP_ROUNDS = 2;
-const REQ_TIMEOUT_MS = 20000;
+const REQ_TIMEOUT_MS = 30000;
 const API_TIMEOUT_MS = 8000;
 
 function log(msg) {
@@ -210,6 +211,25 @@ round.sizeBytes = size;
 return round;
 }
 
+
+function sleep(ms) {
+return new Promise(function (resolve) { setTimeout(resolve, ms); });
+}
+async function downloadWorker(workerId, targetUrl, chunkSize, durationMs) {
+await sleep(workerId * 150);
+let totalBytes = 0;
+let chunks = 0;
+let first = true;
+let loopStart = Date.now();
+while (Date.now() - loopStart < durationMs) {
+const r = await httpGet(rangeUrl(targetUrl, chunkSize), REQ_TIMEOUT_MS);
+if (!r.ok) { log('worker ' + workerId + ' failed: ' + (r.error || r.status)); break; }
+const bytes = countedBytes(r.headers, r.body);
+if (first) { first = false; loopStart = Date.now(); log('worker ' + workerId + ' warmup chunk=' + (bytes / 1048576).toFixed(1) + 'MiB ms=' + r.ms); }
+else { totalBytes += bytes; chunks++; }
+}
+return { totalBytes: totalBytes, chunks: chunks };
+}
 let uploadBodyCache = { size: 0, body: ''};
 function uploadBody(sizeBytes) {
 if (uploadBodyCache.size!== sizeBytes) {
@@ -308,34 +328,26 @@ if (r.ok) latencies.push(r.ms);
 const latency = latencies.length? Math.min.apply(null, latencies): null;
 log('latency probes=' + JSON.stringify(latencies));
 
-// 下载热身
+// 下载：热身 1 轮定块大小，再 6 worker 持续下载 12 秒
 const warmup = await downloadRoundWithFallback(targets, WARMUP_BYTES, REQ_TIMEOUT_MS);
-if (!warmup.totalBytes ||!warmup.okCount) {
-throw new Error('下载热身全部失败（' + warmup.okCount + '/' + warmup.total + (warmup.errors.length? '，' + warmup.errors[0]: '') + '）');
+if (!warmup.totalBytes || !warmup.okCount) {
+throw new Error('下载热身全部失败（' + warmup.okCount + '/' + warmup.total + (warmup.errors.length ? '，' + warmup.errors[0] : '') + '）');
 }
 const warmupMbps = correctedMbps(warmup.totalBytes, warmup.elapsedMs, latency);
-log('warmup=' + warmupMbps.toFixed(1) + ' Mbps size=' + (warmup.sizeBytes / 1048576).toFixed(1) + 'MiB elapsed=' + warmup.elapsedMs + 'ms');
-
-// 按热身估速定主测包大小，目标每轮约 3 秒
-let perConn = Math.round((warmupMbps * 1e6 / 8 * ROUND_TARGET_SEC / CONCURRENCY) / 1048576) * 1048576;
-perConn = Math.max(MIN_BYTES, Math.min(MAX_BYTES, perConn));
-
-const rounds = [];
+log('warmup=' + warmupMbps.toFixed(1) + ' Mbps elapsed=' + warmup.elapsedMs + 'ms');
+const chunkSize = warmupMbps < 20 ? MIN_BYTES : MAX_BYTES;
+log('chunkSize=' + (chunkSize / 1048576).toFixed(0) + 'MiB workers=' + targets.length);
 let downBytes = warmup.totalBytes;
-for (let i = 0; i < MAIN_ROUNDS; i++) {
-const round = await downloadRoundWithFallback(targets, perConn, REQ_TIMEOUT_MS);
-downBytes += round.totalBytes || 0;
-if (round.totalBytes && round.okCount) {
-rounds.push(correctedMbps(round.totalBytes, round.elapsedMs, latency));
-log('download round ' + (i + 1) + '=' + rounds[rounds.length - 1].toFixed(1) + ' Mbps size=' + (round.sizeBytes / 1048576).toFixed(1) + 'MiB elapsed=' + round.elapsedMs + 'ms');
-} else {
-log('download round ' + (i + 1) + ' failed: ' + JSON.stringify(round.errors));
-break;
-}
-}
-if (!rounds.length) throw new Error('下载主测全部失败');
-const downloadMbps = Math.max.apply(null, rounds);
-
+const dlStart = Date.now();
+const workerResults = await Promise.all(targets.map(function (u, i) { return downloadWorker(i, u, chunkSize, WORKER_DURATION_MS); }));
+const dlElapsedMs = Date.now() - dlStart;
+let workerBytes = 0;
+let workerChunks = 0;
+workerResults.forEach(function (w) { workerBytes += w.totalBytes; workerChunks += w.chunks; });
+downBytes += workerBytes;
+log('workers bytes=' + workerBytes + ' chunks=' + workerChunks + ' wall=' + dlElapsedMs + 'ms');
+if (!workerBytes) throw new Error('下载主测没有完成任何一块');
+const downloadMbps = mbps(workerBytes, dlElapsedMs);
 // 上传
 let uploadMbps = null;
 let upBytes = 0;
