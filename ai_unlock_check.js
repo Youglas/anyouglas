@@ -2,7 +2,7 @@
 ================================================================
 ai_unlock_check.js — Quantumult X 检测主流 AI 是否已解锁
 @Author: Tuesday
-@Date: 2026-11-01 (v1)
+@Date: 2026-11-01 (v2: 界面美化，状态徽章 + 汇总卡片)
 @Description:
 检测当前出口 IP（所选策略/节点）能否打开主流 AI 服务。
 每个服务并行检测，7 秒超时，总时长约 8 秒，不会
@@ -248,12 +248,25 @@ const plainLines = results.map(function (r) {
 return ICONS[r.status] + ' ' + r.name + '：' + LABELS[r.status] + '（' + r.detail + '）';
 });
 const footer = okCount + '/' + results.length + ' 已解锁 · ' + secs + 's' + (policy? ' · ' + policy: '');
-const html = '<p style="text-align: left; font-family: -apple-system; font-size: large">'
-+ '<b>' + NAME + '</b></br></br>'
-+ results.map(function (r) {
-return ICONS[r.status] + ' <b>' + r.name + '</b>：' + LABELS[r.status] + ' <span style="font-size:14px">' + r.detail + '</span>';
-}).join('</br>')
-+ '</br></br><span style="font-size:13px">' + footer + '</span></p>';
+const BADGES = {
+ok: '<span style="background:#E6F4EA; color:#137333; padding:3px 10px; border-radius:12px; font-size:13px; font-weight:700">✅ 已解锁</span>',
+blocked: '<span style="background:#FCE8E6; color:#A50E0E; padding:3px 10px; border-radius:12px; font-size:13px; font-weight:700">❌ 未解锁</span>',
+timeout: '<span style="background:#FEF7E0; color:#B06000; padding:3px 10px; border-radius:12px; font-size:13px; font-weight:700">⏱️ 超时</span>',
+unknown: '<span style="background:#F2F2F7; color:#666666; padding:3px 10px; border-radius:12px; font-size:13px; font-weight:700">❓ 未知</span>'
+};
+const rows = results.map(function (r) {
+return '<tr><td style="padding:9px 0; border-bottom:1px solid #E5E5EA"><b>' + r.name + '</b><div style="font-size:12px; color:#8E8E93; margin-top:2px">' + r.detail + '</div></td><td style="text-align:right; padding:9px 0; border-bottom:1px solid #E5E5EA">' + BADGES[r.status] + '</td></tr>';
+}).join('');
+const html = '<div style="font-family:-apple-system; padding:2px">'
++ '<div style="background:#5856D6; background:linear-gradient(135deg,#5856D6,#AF52DE); border-radius:18px; padding:18px 16px; text-align:center; color:#FFFFFF">'
++ '<div style="font-size:12px; letter-spacing:3px; opacity:0.85">🤖 AI 解 锁 检 测</div>'
++ '<div style="font-size:42px; font-weight:800; line-height:1.2">' + okCount + '<span style="font-size:22px; color:#E5E5EA"> / ' + results.length + '</span></div>'
++ '<div style="font-size:13px; opacity:0.9">项服务已解锁</div>'
++ '</div></br>'
++ '<table style="width:100%; font-size:15px; border-collapse:collapse">' + rows + '</table>'
++ '<div style="text-align:center; padding:10px 0 2px; font-size:13px; color:#8E8E93">' + footer + '</div>'
++ '<div style="text-align:center; font-size:12px; color:#AEAEB2">仅测当前出口 IP 能否打开服务，不代表账号能登录</div>'
++ '</div>';
 const plain = plainLines.join('\n') + '\n' + footer;
 log(NAME + ' | ' + plain);
 if (typeof $done!== 'undefined') {

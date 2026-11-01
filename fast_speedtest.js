@@ -2,7 +2,7 @@
 ================================================================
 fast_speedtest.js — Quantumult X 用 fast.com 测当前节点下载 + 上传
 @Author: Tuesday
-@Date: 2026-11-01 (v6: 缩短总时长防超时，4 worker x 6 秒，超时跳过上传保出结果)
+@Date: 2026-11-01 (v7: 界面美化 + 峰值窗口测速，5 worker x 8 秒 15 MiB，取最佳 3 秒平均)
 @Description:
 fast.com 网页版的算法（从 fast.com/app-*.js 实测）：
 duration min 5s / max 30s，连接数随速度自适应到 8，
@@ -40,11 +40,11 @@ event-interaction https://cdn.jsdelivr.net/gh/Youglas/anyouglas@master/fast_spee
 const NAME = 'Fast.com 测速';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const FALLBACK_TOKEN = 'YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm';
-const CONCURRENCY = 4;
+const CONCURRENCY = 5;
 const WARMUP_BYTES = 5 * 1048576;
-const WORKER_DURATION_MS = 6000;
+const WORKER_DURATION_MS = 8000;
 const MIN_BYTES = 5 * 1048576;
-const MAX_BYTES = 10 * 1048576;
+const MAX_BYTES = 15 * 1048576;
 const ROUND_TARGET_SEC = 3.0;
 const UP_TARGET_SEC = 2.0;
 const MAIN_ROUNDS = 3;
@@ -215,18 +215,45 @@ return round;
 function sleep(ms) {
 return new Promise(function (resolve) { setTimeout(resolve, ms); });
 }
+
+var CHUNK_EVENTS = [];
+function bestWindowMbps(events, dlStart, dlEnd, windowMs, skipMs) {
+if (!events || !events.length) return 0;
+var best = 0;
+for (var bucketStart = dlStart + skipMs; bucketStart < dlEnd; bucketStart += windowMs) {
+var bytes = 0;
+for (var i = 0; i < events.length; i++) {
+if (events[i].t >= bucketStart && events[i].t < bucketStart + windowMs) bytes += events[i].bytes;
+}
+var spanMs = Math.min(windowMs, dlEnd - bucketStart);
+if (spanMs < 1000) continue;
+var v = mbps(bytes, spanMs);
+if (v > best) best = v;
+}
+return best;
+}
 async function downloadWorker(workerId, targetUrl, chunkSize, durationMs) {
 await sleep(workerId * 150);
 let totalBytes = 0;
 let chunks = 0;
 let first = true;
+let size = chunkSize;
+let fails = 0;
+let attempts = 0;
 let loopStart = Date.now();
-while (Date.now() - loopStart < durationMs) {
-const r = await httpGet(rangeUrl(targetUrl, chunkSize), REQ_TIMEOUT_MS);
-if (!r.ok) { log('worker ' + workerId + ' failed: ' + (r.error || r.status)); break; }
+while ((Date.now() - loopStart < durationMs || chunks === 0) && attempts < 6) {
+attempts++;
+const r = await httpGet(rangeUrl(targetUrl, size), REQ_TIMEOUT_MS);
+if (!r.ok) {
+fails++;
+log('worker ' + workerId + ' failed: ' + (r.error || r.status) + ' fails=' + fails);
+if (fails >= 2 || size <= MIN_BYTES) break;
+size = Math.max(MIN_BYTES, Math.floor(size / 2));
+continue;
+}
 const bytes = countedBytes(r.headers, r.body);
 if (first) { first = false; loopStart = Date.now(); log('worker ' + workerId + ' warmup chunk=' + (bytes / 1048576).toFixed(1) + 'MiB ms=' + r.ms); }
-else { totalBytes += bytes; chunks++; }
+else { totalBytes += bytes; chunks++; CHUNK_EVENTS.push({ t: Date.now(), bytes: bytes }); }
 }
 return { totalBytes: totalBytes, chunks: chunks };
 }
@@ -267,19 +294,35 @@ round.sizeBytes = size;
 return round;
 }
 
-function buildHtml(download, upload, latency, locationText, footerText) {
-const upLine = upload!== null
-? '<span style="font-size:15px">上传</span></br><span style="font-size:36px; font-weight:bold">' + upload.toFixed(0) + '</span> <span style="font-size:18px">Mbps</span>'
-: '<span style="font-size:15px">上传</span></br><span style="font-size:36px; font-weight:bold">—</span>';
-return '<p style="text-align: center; font-family: -apple-system; font-size: large">'
-+ '<span style="font-size:15px">下载</span></br>'
-+ '<span style="font-size:54px; font-weight:bold">' + download.toFixed(0) + '</span> <span style="font-size:20px">Mbps</span></br></br>'
-+ upLine + '</br></br>'
-+ '<span style="font-size:15px">延迟 ' + (latency!== null? latency + ' ms': '—') + ' · ' + locationText + '</span></br>'
-+ '<span style="font-size:13px">' + footerText + '</span>'
-+ '</p>';
+function barHtml(pct, color) {
+return '<div style="width:100%; height:8px; background:#E5E5EA; border-radius:4px"><div style="width:' + pct + '%; height:8px; background:' + color + '; border-radius:4px"></div></div>';
 }
-
+function buildHtml(download, avgDownload, upload, latency, locationText, footerText, policy) {
+const dlPct = Math.max(2, Math.min(100, Math.round(download / 1000 * 100)));
+const upPct = upload!== null? Math.max(2, Math.min(100, Math.round(upload / 1000 * 100))): 0;
+const upBig = upload!== null? '<span style="font-size:38px; font-weight:800; color:#34C759">' + upload.toFixed(0) + '</span> <span style="font-size:18px; color:#34C759">Mbps</span>': '<span style="font-size:38px; font-weight:800; color:#8E8E93">—</span>';
+const policyRow = policy? '<tr><td style="color:#8E8E93; padding:7px 0">策略</td><td style="text-align:right; font-weight:600">' + policy + '</td></tr>': '';
+return '<div style="font-family:-apple-system; padding:2px">'
++ '<div style="text-align:center; padding:6px 0 10px"><span style="font-size:18px; font-weight:800; letter-spacing:2px">⚡ Fast.com 测速</span></div>'
++ '<div style="background:#007AFF; background:linear-gradient(135deg,#007AFF,#5856D6); border-radius:18px; padding:18px 16px; text-align:center; color:#FFFFFF">'
++ '<div style="font-size:12px; letter-spacing:3px; opacity:0.85">下 载 · DOWNLOAD</div>'
++ '<div style="font-size:58px; font-weight:800; line-height:1.15">' + download.toFixed(0) + '<span style="font-size:20px; font-weight:600"> Mbps</span></div>'
++ '<div style="font-size:13px; opacity:0.9">平均 ' + avgDownload.toFixed(0) + ' Mbps · 最佳 3 秒平均</div>'
++ '</div></br>'
++ barHtml(dlPct, '#007AFF') + '</br>'
++ '<div style="background:#F2F2F7; border-radius:18px; padding:14px 16px; text-align:center">'
++ '<div style="font-size:12px; color:#8E8E93; letter-spacing:3px">上 传 · UPLOAD</div>'
++ '<div style="line-height:1.2">' + upBig + '</div>'
++ '</div></br>'
++ barHtml(upPct, '#34C759') + '</br>'
++ '<table style="width:100%; font-size:14px; border-collapse:collapse">'
++ '<tr><td style="color:#8E8E93; padding:7px 0; border-bottom:1px solid #E5E5EA">延迟</td><td style="text-align:right; font-weight:600; border-bottom:1px solid #E5E5EA">' + (latency!== null? latency + ' ms': '—') + '</td></tr>'
++ '<tr><td style="color:#8E8E93; padding:7px 0; border-bottom:1px solid #E5E5EA">出口</td><td style="text-align:right; font-weight:600; border-bottom:1px solid #E5E5EA">' + locationText + '</td></tr>'
++ policyRow
++ '<tr><td style="color:#8E8E93; padding:7px 0">用时 · 流量</td><td style="text-align:right; font-weight:600">' + footerText + '</td></tr>'
++ '</table>'
++ '</div>';
+}
 function showResult(title, plainLines, html) {
 const plain = plainLines.join('\n');
 log(title + ' | ' + plain);
@@ -319,12 +362,9 @@ const locationText = client.location? [client.location.city, client.location.cou
 const policy = selectedPolicy();
 log('exit=' + exitIp + ' loc=' + locationText + ' policy=' + (policy || '-'));
 
-// 延迟：1 字节连打 5 次取最小
-const latencies = [];
-for (let i = 0; i < 5; i++) {
-const r = await httpGet(rangeUrl(targets[0], 1), 5000);
-if (r.ok) latencies.push(r.ms);
-}
+// 延迟：1 字节并行打 3 次取最小
+const probeResults = await Promise.all([0, 1, 2].map(function () { return httpGet(rangeUrl(targets[0], 1), 5000); }));
+const latencies = probeResults.filter(function (r) { return r.ok; }).map(function (r) { return r.ms; });
 const latency = latencies.length? Math.min.apply(null, latencies): null;
 log('latency probes=' + JSON.stringify(latencies));
 
@@ -336,7 +376,7 @@ throw new Error('下载热身全部失败（' + warmup.okCount + '/' + warmup.to
 }
 const warmupMbps = correctedMbps(warmup.totalBytes, warmup.elapsedMs, latency);
 log('warmup=' + warmupMbps.toFixed(1) + ' Mbps elapsed=' + warmup.elapsedMs + 'ms');
-const chunkSize = warmupMbps < 20 ? MIN_BYTES : MAX_BYTES;
+const chunkSize = warmupMbps < 50 ? MIN_BYTES : (warmupMbps < 150 ? 10 * 1048576 : MAX_BYTES);
 log('phase=workers');
 log('chunkSize=' + (chunkSize / 1048576).toFixed(0) + 'MiB workers=' + targets.length);
 let downBytes = warmup.totalBytes;
@@ -349,12 +389,15 @@ workerResults.forEach(function (w) { workerBytes += w.totalBytes; workerChunks +
 downBytes += workerBytes;
 log('workers bytes=' + workerBytes + ' chunks=' + workerChunks + ' wall=' + dlElapsedMs + 'ms');
 if (!workerBytes) throw new Error('下载主测没有完成任何一块');
-const downloadMbps = mbps(workerBytes, dlElapsedMs);
-// 上传（总时长预算：下载已花 >18s 就跳过上传，保 $done 能出结果）
+const avgDownloadMbps = mbps(workerBytes, dlElapsedMs);
+const peakDownloadMbps = bestWindowMbps(CHUNK_EVENTS, dlStart, dlStart + dlElapsedMs, 3000, 2000);
+const downloadMbps = Math.max(avgDownloadMbps, peakDownloadMbps);
+log('download avg=' + avgDownloadMbps.toFixed(1) + ' peak3s=' + peakDownloadMbps.toFixed(1) + ' headline=' + downloadMbps.toFixed(1));
+// 上传（总时长预算：下载已花 >20s 就跳过上传，保 $done 能出结果）
 log('phase=upload elapsed=' + ((Date.now() - startAll) / 1000).toFixed(1) + 's');
 let uploadMbps = null;
 let upBytes = 0;
-if (Date.now() - startAll > 18000) { log('skip upload: over time budget'); } else {
+if (Date.now() - startAll > 20000) { log('skip upload: over time budget'); } else {
 try {
 const upWarmup = await uploadRoundWithFallback(targets, UP_MIN_BYTES, REQ_TIMEOUT_MS);
 upBytes += upWarmup.totalBytes || 0;
@@ -394,7 +437,7 @@ uploadMbps!== null? '上传 ' + uploadMbps.toFixed(0) + ' Mbps': '上传 —',
 '延迟 ' + (latency!== null? latency + ' ms': '—') + ' · ' + locationText,
 footer
 ];
-const html = buildHtml(downloadMbps, uploadMbps, latency, locationText, footer);
+const html = buildHtml(downloadMbps, avgDownloadMbps, uploadMbps, latency, locationText, footer, policy);
 showResult(NAME, plainLines, html);
 } catch (e) {
 const plainLines = ['测速失败', String((e && e.message) || e)];
