@@ -2,7 +2,7 @@
 ================================================================
 ai_unlock_check.js — Quantumult X 检测主流 AI 是否已解锁
 @Author: Tuesday
-@Date: 2026-11-01 (v5: 逻辑同 v1，界面对齐排版：列表式，名称+说明在左，状态在右对齐，行距舒适)
+@Date: 2026-11-01 (v6: 逻辑同 v1，界面按流媒体服务查询弹窗样式：居中、粗体、虚线分隔、红色节点脚注、🎉/🚫/🚦/❗、⇢ [国旗])
 @Description:
 检测当前出口 IP（所选策略/节点）能否打开主流 AI 服务。
 每个服务并行检测，7 秒超时，总时长约 8 秒，不会
@@ -214,6 +214,13 @@ if (api.status) return { status: 'unknown', detail: 'API HTTP ' + api.status};
 return { status: 'unknown', detail: home.error || '无响应'};
 }
 
+
+const FLAGS = { US: '🇺🇸', JP: '🇯🇵', SG: '🇸🇬', HK: '🇭🇰', TW: '🇨🇳', GB: '🇬🇧', DE: '🇩🇪', FR: '🇫🇷', NL: '🇳🇱', KR: '🇰🇷', AU: '🇦🇺', CA: '🇨🇦', CH: '🇨🇭', IT: '🇮🇹', ES: '🇪🇸', IN: '🇮🇳', BR: '🇧🇷', MX: '🇲🇽', ID: '🇮🇩', MY: '🇲🇾', TH: '🇹🇭', VN: '🇻🇳', PH: '🇵🇭', NZ: '🇳🇿', SE: '🇸🇪', NO: '🇳🇴', DK: '🇩🇰', FI: '🇫🇮', IE: '🇮🇪', AT: '🇦🇹', BE: '🇧🇪', PL: '🇵🇱', TR: '🇹🇷', AE: '🇦🇪', ZA: '🇿🇦', AR: '🇦🇷', CL: '🇨🇱' };
+function flagFor(detail) {
+var m = detail ? detail.match(/\b([A-Z]{2})\b/) : null;
+if (m && FLAGS[m[1]]) return ' ⇢ [' + FLAGS[m[1]] + ']';
+return '';
+}
 const CHECKS = [
 { name: 'ChatGPT', fn: checkChatGPT},
 { name: 'OpenAI API', fn: checkOpenAIAPI},
@@ -254,15 +261,18 @@ const rowsPlain = results.map(function (r) {
 return r.name + ': ' + ICONS[r.status] + ' ' + LABELS[r.status] + ' (' + r.detail + ')';
 }).join('\n');
 const plain = rowsPlain + '\n\n📋 检测结论\n\n' + verdict + '\n\n节点: ' + nodeLine;
-const rowsHtml = results.map(function (r) {
-return '<tr><td style="padding:8px 0; vertical-align:middle"><b>' + r.name + '</b><br><font color="#8E8E93" size="2">' + r.detail + '</font></td><td style="padding:8px 0; text-align:right; vertical-align:middle; white-space:nowrap">' + ICONS[r.status] + ' ' + LABELS[r.status] + '</td></tr>';
-}).join('');
-const html = '<table style="width:100%; border-collapse:collapse; font-family:-apple-system; font-size:16px; line-height:1.5">'
-+ rowsHtml
-+ '<tr><td colspan="2" style="padding:16px 0 4px">📋 <b>检测结论</b></td></tr>'
-+ '<tr><td colspan="2" style="padding:4px 0">' + verdict + '</td></tr>'
-+ '<tr><td style="padding:10px 0 2px; vertical-align:top"><b>节点:</b></td><td style="padding:10px 0 2px; text-align:right; vertical-align:top"><font color="#0A84FF">' + nodeLine + '</font></td></tr>'
-+ '</table>';
+function aiLine(r) {
+if (r.status === 'ok') return '<b>' + r.name + ': 支持' + flagFor(r.detail) + ' 🎉</b>';
+if (r.status === 'blocked') return '<b>' + r.name + ': 未支持 🚫</b>';
+if (r.status === 'timeout') return '<b>' + r.name + ': 检测超时 🚦</b>';
+return '<b>' + r.name + ': 检测失败 ❗</b>';
+}
+const lines = results.map(aiLine);
+const html = '<p style="text-align: center; font-family: -apple-system; font-size: large; font-weight: thin">'
++ '------------------------------' + '</br>' + lines.join('</br></br>')
++ '</br>------------------------------</br>'
++ '<font color=#CD5C5C><b>节点</b> ⇢ ' + nodeLine + '</font>'
++ '</p>';
 log(NAME + ' | ' + plain);
 if (typeof $done!== 'undefined') {
 try { $done({ title: '🤖 AI 解锁检测', message: plain, htmlMessage: html});}

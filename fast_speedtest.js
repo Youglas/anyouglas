@@ -2,7 +2,7 @@
 ================================================================
 fast_speedtest.js — Quantumult X 用 fast.com 测当前节点下载 + 上传
 @Author: Tuesday
-@Date: 2026-11-01 (v10: 逻辑同 v4，界面对齐排版：表格两栏，标签列等宽，数值列对齐，行距舒适)
+@Date: 2026-11-01 (v11: 逻辑同 v4，界面按流媒体服务查询弹窗样式：居中、粗体、虚线分隔、红色节点脚注)
 @Description:
 fast.com 网页版的算法（从 fast.com/app-*.js 实测）：
 duration min 5s / max 30s，连接数随速度自适应到 8，
@@ -248,32 +248,26 @@ return round;
 }
 
 function buildPanel(download, upload, latency, locationText, footerText, policy) {
-var verdict = download >= 200 ? '✅ 速度良好' : (download >= 50 ? '✅ 速度一般' : '⚠️ 速度偏慢');
-var nodeLine = policy ? policy : locationText;
 var fparts = footerText.split(' · ');
 var plain = '下载: ' + download.toFixed(0) + ' Mbps\n'
 + '上传: ' + (upload!== null? upload.toFixed(0) + ' Mbps': '—') + '\n'
 + '延迟: ' + (latency!== null? latency + ' ms': '—') + '\n'
 + '出口: ' + locationText + '\n'
 + '用时: ' + (fparts[0] ? fparts[0].replace('用时 ', '') : '') + '\n'
-+ '流量: ' + (fparts[1] ? fparts[1].replace('流量 ', '') : '') + '\n\n'
-+ '📋 测速结论\n\n'
-+ verdict + '\n\n'
-+ '节点: ' + nodeLine;
-function row(label, value, boldValue) {
-return '<tr><td style="width:68px; padding:7px 0; vertical-align:top"><b>' + label + ':</b></td><td style="padding:7px 0; vertical-align:top">' + (boldValue ? '<b>' + value + '</b>' : value) + '</td></tr>';
-}
-var html = '<table style="width:100%; border-collapse:collapse; font-family:-apple-system; font-size:16px; line-height:1.5">'
-+ row('下载', download.toFixed(0) + ' Mbps', true)
-+ row('上传', upload!== null? upload.toFixed(0) + ' Mbps': '—', true)
-+ row('延迟', latency!== null? latency + ' ms': '—', false)
-+ row('出口', locationText, false)
-+ row('用时', fparts[0] ? fparts[0].replace('用时 ', '') : '', false)
-+ row('流量', fparts[1] ? fparts[1].replace('流量 ', '') : '', false)
-+ '<tr><td colspan="2" style="padding:16px 0 4px">📋 <b>测速结论</b></td></tr>'
-+ '<tr><td colspan="2" style="padding:4px 0">' + verdict + '</td></tr>'
-+ '<tr><td style="width:68px; padding:10px 0 2px; vertical-align:top"><b>节点:</b></td><td style="padding:10px 0 2px; vertical-align:top"><font color="#0A84FF">' + nodeLine + '</font></td></tr>'
-+ '</table>';
++ '流量: ' + (fparts[1] ? fparts[1].replace('流量 ', '') : '');
+var lines = [
+'<b>下载: ' + download.toFixed(0) + ' Mbps</b>',
+'<b>上传: ' + (upload!== null? upload.toFixed(0) + ' Mbps': '—') + '</b>',
+'<b>延迟: ' + (latency!== null? latency + ' ms': '—') + '</b>',
+'<b>出口: ' + locationText + '</b>',
+'<b>用时: ' + (fparts[0] ? fparts[0].replace('用时 ', '') : '') + ' · 流量: ' + (fparts[1] ? fparts[1].replace('流量 ', '') : '') + '</b>'
+];
+var nodeLine = policy ? policy : locationText;
+var html = '<p style="text-align: center; font-family: -apple-system; font-size: large; font-weight: thin">'
++ '------------------------------' + '</br>' + lines.join('</br></br>')
++ '</br>------------------------------</br>'
++ '<font color=#CD5C5C><b>节点</b> ⇢ ' + nodeLine + '</font>'
++ '</p>';
 return { plain: plain, html: html };
 }
 function showResult(title, plain, html) {
