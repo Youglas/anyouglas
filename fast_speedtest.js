@@ -2,7 +2,7 @@
 ================================================================
 fast_speedtest.js — Quantumult X 用 fast.com 测当前节点下载 + 上传
 @Author: Tuesday
-@Date: 2026-11-01 (v5: 工作线程持续下载，逼近网页版)
+@Date: 2026-11-01 (v6: 缩短总时长防超时，4 worker x 6 秒，超时跳过上传保出结果)
 @Description:
 fast.com 网页版的算法（从 fast.com/app-*.js 实测）：
 duration min 5s / max 30s，连接数随速度自适应到 8，
@@ -40,18 +40,18 @@ https://cdn.jsdelivr.net/gh/Youglas/anyouglas@master/fast_speedtest.js, tag=Fast
 const NAME = 'Fast.com 测速';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
 const FALLBACK_TOKEN = 'YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm';
-const CONCURRENCY = 6;
-const WARMUP_BYTES = 10 * 1048576;
-const WORKER_DURATION_MS = 12000;
+const CONCURRENCY = 4;
+const WARMUP_BYTES = 5 * 1048576;
+const WORKER_DURATION_MS = 6000;
 const MIN_BYTES = 5 * 1048576;
-const MAX_BYTES = 15 * 1048576;
+const MAX_BYTES = 10 * 1048576;
 const ROUND_TARGET_SEC = 3.0;
 const UP_TARGET_SEC = 2.0;
 const MAIN_ROUNDS = 3;
 const UP_MIN_BYTES = 1048576;
 const UP_MAX_BYTES = 5 * 1048576;
-const UP_ROUNDS = 2;
-const REQ_TIMEOUT_MS = 30000;
+const UP_ROUNDS = 1;
+const REQ_TIMEOUT_MS = 15000;
 const API_TIMEOUT_MS = 8000;
 
 function log(msg) {
@@ -329,6 +329,7 @@ const latency = latencies.length? Math.min.apply(null, latencies): null;
 log('latency probes=' + JSON.stringify(latencies));
 
 // 下载：热身 1 轮定块大小，再 6 worker 持续下载 12 秒
+log('phase=warmup');
 const warmup = await downloadRoundWithFallback(targets, WARMUP_BYTES, REQ_TIMEOUT_MS);
 if (!warmup.totalBytes || !warmup.okCount) {
 throw new Error('下载热身全部失败（' + warmup.okCount + '/' + warmup.total + (warmup.errors.length ? '，' + warmup.errors[0] : '') + '）');
@@ -336,6 +337,7 @@ throw new Error('下载热身全部失败（' + warmup.okCount + '/' + warmup.to
 const warmupMbps = correctedMbps(warmup.totalBytes, warmup.elapsedMs, latency);
 log('warmup=' + warmupMbps.toFixed(1) + ' Mbps elapsed=' + warmup.elapsedMs + 'ms');
 const chunkSize = warmupMbps < 20 ? MIN_BYTES : MAX_BYTES;
+log('phase=workers');
 log('chunkSize=' + (chunkSize / 1048576).toFixed(0) + 'MiB workers=' + targets.length);
 let downBytes = warmup.totalBytes;
 const dlStart = Date.now();
@@ -348,9 +350,11 @@ downBytes += workerBytes;
 log('workers bytes=' + workerBytes + ' chunks=' + workerChunks + ' wall=' + dlElapsedMs + 'ms');
 if (!workerBytes) throw new Error('下载主测没有完成任何一块');
 const downloadMbps = mbps(workerBytes, dlElapsedMs);
-// 上传
+// 上传（总时长预算：下载已花 >18s 就跳过上传，保 $done 能出结果）
+log('phase=upload elapsed=' + ((Date.now() - startAll) / 1000).toFixed(1) + 's');
 let uploadMbps = null;
 let upBytes = 0;
+if (Date.now() - startAll > 18000) { log('skip upload: over time budget'); } else {
 try {
 const upWarmup = await uploadRoundWithFallback(targets, UP_MIN_BYTES, REQ_TIMEOUT_MS);
 upBytes += upWarmup.totalBytes || 0;
@@ -378,6 +382,7 @@ log('upload warmup failed: ' + JSON.stringify(upWarmup.errors));
 }
 } catch (e) {
 log('upload failed: ' + e);
+}
 }
 
 const totalSec = ((Date.now() - startAll) / 1000).toFixed(0);
