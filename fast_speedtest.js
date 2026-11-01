@@ -273,7 +273,7 @@ return { plain: plain, html: html };
 function showResult(title, plain, html) {
 log(title + ' | ' + plain);
 if (typeof $done!== 'undefined') {
-try { $done({ title: title, message: plain, htmlMessage: html }); }
+try { $done({ title: title, htmlMessage: html }); }
 catch (e) { try { $done(); } catch (e2) { /* ignore */ } }
 }
 }

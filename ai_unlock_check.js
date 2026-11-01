@@ -275,7 +275,7 @@ const html = '<p style="text-align: center; font-family: -apple-system; font-siz
 + '</p>';
 log(NAME + ' | ' + plain);
 if (typeof $done!== 'undefined') {
-try { $done({ title: '🤖 AI 解锁检测', message: plain, htmlMessage: html});}
+try { $done({ title: '🤖 AI 解锁检测', htmlMessage: html});}
 catch (e) { try { $done();} catch (e2) { /* ignore */}}
 }
 }
