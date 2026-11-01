@@ -2,7 +2,7 @@
 ================================================================
 fast_speedtest.js — Quantumult X 用 fast.com 测当前节点下载 + 上传
 @Author: Tuesday
-@Date: 2026-11-01 (v8: 逻辑同 v4（已验证出结果），仅界面美化，QX 原生标签渲染)
+@Date: 2026-11-01 (v9: 逻辑同 v4，界面按节点阻断检测弹窗样式：左对齐、粗体标签、空行分组、结论区、节点蓝色)
 @Description:
 fast.com 网页版的算法（从 fast.com/app-*.js 实测）：
 duration min 5s / max 30s，连接数随速度自适应到 8，
@@ -20,7 +20,7 @@ QX 的 $task.fetch 只支持文本 body、单请求默认 10 秒，
 1 MiB 热身 → 2 轮主测（每连接 1~5 MiB），取最快
 一轮；上传失败不影响下载结果，显示为 —。
 - 延迟：1 字节 range 连打 5 次取最小值。
-界面美化版：大字彩色数字、字符进度条、分隔线、信息表；逻辑与 v4 完全一致，不追速度。
+界面按截图样式：左对齐纯文本排版、粗体标签、空行分组、结论区；逻辑与 v4 完全一致，不追速度。
 细节（各轮、策略、出口 IP）只写 console.log。
 
 
@@ -247,46 +247,36 @@ round.sizeBytes = size;
 return round;
 }
 
-function textBar(mbpsVal) {
-var filled = Math.max(0, Math.min(20, Math.round((mbpsVal || 0) / 1000 * 20)));
-var bar = '';
-for (var i = 0; i < 20; i++) bar += (i < filled ? '█' : '░');
-return bar;
-}
-function buildHtml(download, upload, latency, locationText, footerText, policy) {
-var upBig = upload!== null? '<font color="#34C759"><span style="font-size:38px; font-weight:bold">' + upload.toFixed(0) + '</span> <span style="font-size:18px">Mbps</span></font>': '<span style="font-size:38px; font-weight:bold">—</span>';
-var upBar = upload!== null? '<font color="#34C759">' + textBar(upload) + '</font>': '';
-var policyLine = policy? '</br><font color="#8E8E93">策略</font>　<b>' + policy + '</b>': '';
-return '<p style="text-align: center; font-family: -apple-system; font-size: large">'
-+ '<b><font color="#007AFF">⚡ Fast.com 测速</font></b> <font color="#AEAEB2" size="2">v8</font></br>'
-+ '──────────────────────</br>'
-+ '<font color="#8E8E93">下 载 · DOWNLOAD</font></br>'
-+ '<font color="#007AFF"><span style="font-size:60px; font-weight:bold">' + download.toFixed(0) + '</span> <span style="font-size:20px">Mbps</span></font></br>'
-+ '<font color="#007AFF">' + textBar(download) + '</font></br></br>'
-+ '<font color="#8E8E93">上 传 · UPLOAD</font></br>'
-+ upBig + '</br>'
-+ upBar + '</br></br>'
-+ '──────────────────────</br>'
-+ '<font color="#8E8E93">延迟</font>　<b>' + (latency!== null? latency + ' ms': '—') + '</b>　<font color="#8E8E93">出口</font>　<b>' + locationText + '</b>'
-+ policyLine + '</br>'
-+ '<font color="#8E8E93">' + footerText + '</font>'
+function buildPanel(download, upload, latency, locationText, footerText, policy) {
+var verdict = download >= 200 ? '✅ 速度良好' : (download >= 50 ? '✅ 速度一般' : '⚠️ 速度偏慢');
+var nodeLine = policy ? policy : locationText;
+var fparts = footerText.split(' · ');
+var plain = '下载: ' + download.toFixed(0) + ' Mbps\n'
++ '上传: ' + (upload!== null? upload.toFixed(0) + ' Mbps': '—') + '\n'
++ '延迟: ' + (latency!== null? latency + ' ms': '—') + '\n'
++ '出口: ' + locationText + '\n'
++ '用时: ' + (fparts[0] ? fparts[0].replace('用时 ', '') : '') + '\n'
++ '流量: ' + (fparts[1] ? fparts[1].replace('流量 ', '') : '') + '\n\n'
++ '📋 测速结论\n\n'
++ verdict + '\n\n'
++ '节点: ' + nodeLine;
+var html = '<p style="text-align: left; font-family: -apple-system; font-size: large">'
++ '<b>下载:</b> ' + download.toFixed(0) + ' Mbps</br>'
++ '<b>上传:</b> ' + (upload!== null? upload.toFixed(0) + ' Mbps': '—') + '</br>'
++ '<b>延迟:</b> ' + (latency!== null? latency + ' ms': '—') + '</br>'
++ '<b>出口:</b> ' + locationText + '</br>'
++ '<b>用时:</b> ' + (fparts[0] ? fparts[0].replace('用时 ', '') : '') + '　<b>流量:</b> ' + (fparts[1] ? fparts[1].replace('流量 ', '') : '') + '</br></br>'
++ '📋 <b>测速结论</b></br></br>'
++ verdict + '</br></br>'
++ '<b>节点:</b> <font color="#0A84FF">' + nodeLine + '</font>'
 + '</p>';
+return { plain: plain, html: html };
 }
-function showResult(title, plainLines, html) {
-const plain = plainLines.join('\n');
+function showResult(title, plain, html) {
 log(title + ' | ' + plain);
-const subtitle = plainLines[0] + (plainLines[1]? ' · ' + plainLines[1]: '');
-if (typeof $notify!== 'undefined') {
-try { $notify(title, subtitle, plain);} catch (e) { log('notify failed: ' + e);}
-} else if (typeof $notification!== 'undefined' && $notification.post) {
-try { $notification.post(title, subtitle, plain);} catch (e) { log('notify failed: ' + e);}
-}
 if (typeof $done!== 'undefined') {
-try {
-$done({ title: title, message: plain, htmlMessage: html});
-} catch (e) {
-try { $done();} catch (e2) { /* ignore */}
-}
+try { $done({ title: title, message: plain, htmlMessage: html }); }
+catch (e) { try { $done(); } catch (e2) { /* ignore */ } }
 }
 }
 
@@ -389,12 +379,12 @@ uploadMbps!== null? '上传 ' + uploadMbps.toFixed(0) + ' Mbps': '上传 —',
 '延迟 ' + (latency!== null? latency + ' ms': '—') + ' · ' + locationText,
 footer
 ];
-const html = buildHtml(downloadMbps, uploadMbps, latency, locationText, footer, policy);
-showResult(NAME, plainLines, html);
+const panel = buildPanel(downloadMbps, uploadMbps, latency, locationText, footer, policy);
+showResult('⚡ Fast.com 测速', panel.plain, panel.html);
 } catch (e) {
-const plainLines = ['测速失败', String((e && e.message) || e)];
-const html = '<p style="text-align: center; font-family: -apple-system; font-size: large">测速失败</br><span style="font-size:15px">' + String((e && e.message) || e) + '</span></p>';
-showResult(NAME, plainLines, html);
+const failPlain = '测速失败\n\n' + String((e && e.message) || e);
+const failHtml = '<p style="text-align: left; font-family: -apple-system; font-size: large"><b>测速失败</b></br></br>' + String((e && e.message) || e) + '</p>';
+showResult('⚡ Fast.com 测速', failPlain, failHtml);
 }
 }
 

@@ -2,7 +2,7 @@
 ================================================================
 ai_unlock_check.js — Quantumult X 检测主流 AI 是否已解锁
 @Author: Tuesday
-@Date: 2026-11-01 (v3: 界面美化，QX 原生标签渲染：大字汇总、彩色状态、分隔线；逻辑同 v1)
+@Date: 2026-11-01 (v4: 界面按节点阻断检测弹窗样式：左对齐、粗体标签、空行分组、结论区、节点蓝色；逻辑同 v1)
 @Description:
 检测当前出口 IP（所选策略/节点）能否打开主流 AI 服务。
 每个服务并行检测，7 秒超时，总时长约 8 秒，不会
@@ -248,28 +248,24 @@ const plainLines = results.map(function (r) {
 return ICONS[r.status] + ' ' + r.name + '：' + LABELS[r.status] + '（' + r.detail + '）';
 });
 const footer = okCount + '/' + results.length + ' 已解锁 · ' + secs + 's' + (policy? ' · ' + policy: '');
-const COLORS = { ok: '#137333', blocked: '#A50E0E', timeout: '#B06000', unknown: '#666666' };
-const rows = results.map(function (r) {
-return '<b>' + r.name + '</b>　<font color="' + COLORS[r.status] + '"><b>' + ICONS[r.status] + ' ' + LABELS[r.status] + '</b></font></br><font color="#8E8E93" size="2">' + r.detail + '</font>';
-}).join('</br></br>');
-const html = '<p style="text-align: center; font-family: -apple-system; font-size: large">'
-+ '<b><font color="#5856D6">🤖 AI 解锁检测</font></b> <font color="#AEAEB2" size="2">v3</font></br>'
-+ '──────────────────────</br>'
-+ '<font color="#5856D6"><span style="font-size:42px; font-weight:bold">' + okCount + ' / ' + results.length + '</span></font></br>'
-+ '<font color="#8E8E93">项服务已解锁</font></br>'
-+ '──────────────────────</br></p>'
-+ '<p style="text-align: left; font-family: -apple-system; font-size: large">'
-+ rows
-+ '</p>'
-+ '<p style="text-align: center; font-family: -apple-system; font-size: large">'
-+ '──────────────────────</br>'
-+ '<font color="#8E8E93">' + footer + '</font></br>'
-+ '<font color="#AEAEB2" size="2">仅测当前出口 IP 能否打开服务，不代表账号能登录</font>'
+const verdict = okCount === results.length ? '✅ 全部已解锁' : (okCount * 2 >= results.length ? '⚠️ 部分已解锁' : '❌ 大多未解锁');
+const nodeLine = policy || '未知';
+const rowsPlain = results.map(function (r) {
+return r.name + ': ' + ICONS[r.status] + ' ' + LABELS[r.status] + ' (' + r.detail + ')';
+}).join('\n');
+const plain = rowsPlain + '\n\n📋 检测结论\n\n' + verdict + '\n\n节点: ' + nodeLine;
+const rowsHtml = results.map(function (r) {
+return '<b>' + r.name + ':</b> ' + ICONS[r.status] + ' ' + LABELS[r.status] + ' <font color="#8E8E93">(' + r.detail + ')</font>';
+}).join('</br>');
+const html = '<p style="text-align: left; font-family: -apple-system; font-size: large">'
++ rowsHtml + '</br></br>'
++ '📋 <b>检测结论</b></br></br>'
++ verdict + '</br></br>'
++ '<b>节点:</b> <font color="#0A84FF">' + nodeLine + '</font>'
 + '</p>';
-const plain = plainLines.join('\n') + '\n' + footer;
 log(NAME + ' | ' + plain);
 if (typeof $done!== 'undefined') {
-try { $done({ title: NAME, message: plain, htmlMessage: html});}
+try { $done({ title: '🤖 AI 解锁检测', message: plain, htmlMessage: html});}
 catch (e) { try { $done();} catch (e2) { /* ignore */}}
 }
 }
