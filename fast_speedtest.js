@@ -32,8 +32,8 @@ QX 的 $task.fetch 只支持文本 body、单请求默认 10 秒，
 
 手动点测（换成新 commit 固定地址可绕过
 QX 24 小时远程缓存）：
-[event-interaction]
-https://cdn.jsdelivr.net/gh/Youglas/anyouglas@master/fast_speedtest.js, tag=Fast测速, img-url=bolt.square.fill.system, enabled=true
+[task_local]
+event-interaction https://cdn.jsdelivr.net/gh/Youglas/anyouglas@master/fast_speedtest.js, tag=Fast测速, img-url=bolt.square.fill.system, enabled=true
 ================================================================
 */
 

@@ -40,8 +40,8 @@ https://api.x.ai/v1/models 401 "No credentials" = 已解锁。
 
 手动点测（固定 commit 地址，绕过 QX
 24 小时远程缓存）：
-[event-interaction]
-https://cdn.jsdelivr.net/gh/Youglas/anyouglas@master/ai_unlock_check.js, tag=AI解锁检测, img-url=checkmark.seal.system, enabled=true
+[task_local]
+event-interaction https://cdn.jsdelivr.net/gh/Youglas/anyouglas@master/ai_unlock_check.js, tag=AI解锁检测, img-url=checkmark.seal.system, enabled=true
 ================================================================
 */
 
