@@ -2,44 +2,48 @@
 ================================================================
 fast_speedtest.js — Quantumult X 用 fast.com 测当前节点下载速度
 @Author: Tuesday
-@Date: 2026-11-01 (v2: 修复 event-interaction 显示 No Results)
+@Date: 2026-11-01 (v3: 更接近 fast.com 网页版的多轮稳态测速)
 @Description:
 1. 动态从 fast.com 抓 token（token 会轮换，不写死）,
 失败时回落到 2026-11-01 实测有效的 token；
 2. 调 api.fast.com/netflix/speedtest/v2 拿 Netflix OCA
 测速节点（targets），按 fast.com 网页版的做法把
 URL 改成 /speedtest/range/0-<字节数> 形式下载；
-3. 先 3 并发各下 1 MiB 探针估速，再按估速自适应
-主测包大小（每连接 2~4 MiB，3 并发），算下载速度；
+3. fast.com 网页版用 3 个连接、25 MB 级请求、连续
+下载并算最大速度，且会丢掉开头的慢启动阶段。
+QX 的 $task.fetch 只支持文本 body、单请求默认 10 秒，
+25 MB x 3 并发在手机上既占内存又易超时，所以 v3
+用等效做法：1 MiB 探针估速后，做 3 轮主测（每轮
+约 2 秒、每连接 2~10 MiB），扣掉 1 字节 probe 测到
+的连接建立时间，取最快一轮作为 headline，同时给
+出 3 轮合计的稳态值。v2 只有单轮小包，握手/慢启动
+占了全程很大比例，是偏低的主要原因；
 4. 结果以 event-interaction 弹窗 + 通知两种方式给出，
 并带上 fast.com 看到的出口 IP，用来核对流量到底
 走没走节点。
 
 
-- v1 只调 $notify + 空 $done()。QX 点 event-interaction
-时，弹窗内容来自 $done({title, htmlMessage})，空 $done()
-就会显示 No Results，通知在 QX 前台时也可能看不到。
-v2 改为 $done({title, message, htmlMessage})，失败时也
-一样返回弹窗，不再出现 No Results。
-- v2 给 $task.fetch 显式传 timeout（毫秒）和
+- event-interaction 弹窗来自 $done({title, htmlMessage})，
+空 $done() 会显示 No Results，v2 起成功/失败都返回弹窗。
+- $task.fetch 显式传 timeout（毫秒）和
 opts.policy = $environment.params（点任务时选中的
-策略/节点），走 geo_location.js / streaming-ui-check.js
-同款写法，让请求真正走当前选中的节点，而不是只看
-Finals 的默认路由。$environment.params 为空时不传。
-- QX 的 $task.fetch 默认超时 10 秒，单次下载包改小
-（主测每连接最多 4 MiB），避免 8 MiB 在慢节点上
-撞上默认超时。
+策略/节点），走 geo_location.js 同款写法。
 
 
-- 这是下载测速，不是 QX 自带的延迟测试。一次运行约用
-6~15 MB 流量，别挂 cron 高频跑，建议 event-interaction
-手动点一次测一次。
+- 精准要花流量：v3 一次约 30~90 MB（视速度而定），
+别挂 cron 高频跑，手动点测一次即可。想省流量就把
+下面的 MAIN_ROUNDS 改成 1，数值会回落到接近 v2。
 - 如果弹窗里的出口 IP 是你的真实 IP，说明这部分流量
 走了直连，测的是直连速度，不是节点速度。
 - 测速值按 Content-Length 计字节，不按 body.length 计，
 因为 OCA 返回的是二进制，JS 字符串长度不等于字节数。
+- 和网页版仍不会完全相等：浏览器用 ArrayBuffer/流式
+计字节，QX 只能用文本 body，解码开销会计入时间；
+而且同一时刻节点/OCA 的拥塞也不同。看趋势和相对
+变化比盯单次绝对值更靠谱。
 
-手动点测：
+手动点测（换成新 commit 固定地址可绕过
+QX 24 小时远程缓存，见回复里的地址）：
 [event-interaction]
 https://cdn.jsdelivr.net/gh/Youglas/anyouglas@master/fast_speedtest.js, tag=Fast测速, img-url=bolt.square.fill.system, enabled=true
 ================================================================
@@ -47,21 +51,20 @@ https://cdn.jsdelivr.net/gh/Youglas/anyouglas@master/fast_speedtest.js, tag=Fast
 
 const NAME = 'Fast.com 测速';
 const UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1';
-// 2026-11-01 从 https://fast.com/app-*.js 实测提取，仅作动态获取失败时的回落
 const FALLBACK_TOKEN = 'YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm';
-const CONCURRENCY = 3; // 并发连接数
-const PROBE_BYTES = 1048576; // 探针：每连接 1 MiB
-const MIN_BYTES = 2 * 1048576; // 主测：每连接最少 2 MiB
-const MAX_BYTES = 4 * 1048576; // 主测：每连接最多 4 MiB（QX 单请求默认 10 秒超时，包太大易超时）
-const REQ_TIMEOUT_MS = 10000; // 单次下载超时，毫秒，和 $task.fetch 的 timeout 字段一致
+const CONCURRENCY = 3;
+const PROBE_BYTES = 1048576;
+const MAIN_ROUNDS = 3;
+const ROUND_TARGET_SEC = 2.0;
+const MIN_BYTES = 2 * 1048576;
+const MAX_BYTES = 10 * 1048576;
+const REQ_TIMEOUT_MS = 10000;
 const API_TIMEOUT_MS = 8000;
 
 function log(msg) {
 if (typeof console!== 'undefined' && console.log) console.log('[' + NAME + '] ' + msg);
 }
 
-// 点 event-interaction 时 QX 弹窗只认 $done({title, htmlMessage})，
-// 所以成功和失败都走这里；同时再发一条 $notify，cron 模式也能看到。
 function showResult(title, subtitle, plainMessage, htmlMessage) {
 log(title + ' | ' + subtitle + ' | ' + plainMessage);
 if (typeof $notify!== 'undefined') {
@@ -82,13 +85,11 @@ function escapeHtml(s) {
 return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-function toHtml(title, lines) {
+function toHtml(lines) {
 const body = lines.map(function (l) { return escapeHtml(l);}).join('</br>');
 return '<p style="text-align: center; font-family: -apple-system; font-size: large; font-weight: thin">' + body + '</p>';
 }
 
-// 点任务时选中的策略/节点名，QX 放在 $environment.params 里；
-// 没有时返回 null，请求就按 QX 规则走，不强行指定。
 function selectedPolicy() {
 try {
 if (typeof $environment!== 'undefined' && $environment && typeof $environment.params === 'string' && $environment.params) {
@@ -210,6 +211,14 @@ if (!elapsedMs || elapsedMs <= 0) return 0;
 return (bytes * 8) / (elapsedMs / 1000) / 1e6;
 }
 
+// 扣掉连接建立时间后的速度：1 字节 probe 的耗时近似等于
+// TCP+TLS+首字节开销，它不属于传输本身。保底 50ms，避免
+// 极短一轮算出离谱值。
+function correctedMbps(bytes, elapsedMs, setupMs) {
+const corrected = Math.max(elapsedMs - (setupMs || 0), 50);
+return mbps(bytes, corrected);
+}
+
 async function main() {
 try {
 let token = await fetchToken();
@@ -243,34 +252,58 @@ throw new Error('下载探针全部失败（' + probe.okCount + '/' + probe.tota
 }
 const probeMbps = mbps(probe.totalBytes, probe.elapsedMs);
 
-let perConn = Math.round((probeMbps * 1e6 / 8 * 3.5 / CONCURRENCY) / 1048576) * 1048576;
-perConn = Math.max(MIN_BYTES, Math.min(MAX_BYTES, perConn));
-const mainTest = await downloadRound(targets, perConn, REQ_TIMEOUT_MS);
-let finalMbps = probeMbps;
-if (mainTest.totalBytes && mainTest.okCount) {
-finalMbps = mbps(mainTest.totalBytes, mainTest.elapsedMs);
+// 每轮目标约 2 秒；慢节点用 1 MiB 保底，避免单轮撞 10 秒超时
+const minBytes = probeMbps < 8? 1048576: MIN_BYTES;
+let perConn = Math.round((probeMbps * 1e6 / 8 * ROUND_TARGET_SEC / CONCURRENCY) / 1048576) * 1048576;
+perConn = Math.max(minBytes, Math.min(MAX_BYTES, perConn));
+
+const rounds = [];
+let totalBytes = probe.totalBytes;
+for (let i = 0; i < MAIN_ROUNDS; i++) {
+const round = await downloadRound(targets, perConn, REQ_TIMEOUT_MS);
+totalBytes += round.totalBytes || 0;
+if (round.totalBytes && round.okCount) {
+rounds.push({
+raw: mbps(round.totalBytes, round.elapsedMs),
+corrected: correctedMbps(round.totalBytes, round.elapsedMs, latency),
+bytes: round.totalBytes,
+elapsedMs: round.elapsedMs
+});
+}
+if (!round.totalBytes) break;
+}
+if (!rounds.length) {
+throw new Error('主测 3 轮全部失败，请检查节点是否能访问 Netflix CDN');
 }
 
-const totalMB = (probe.totalBytes + (mainTest.totalBytes || 0)) / 1048576;
+const best = rounds.reduce(function (a, b) { return b.corrected > a.corrected? b: a;}, rounds[0]);
+const aggBytes = rounds.reduce(function (s, r) { return s + r.bytes;}, 0);
+const aggElapsed = rounds.reduce(function (s, r) { return s + r.elapsedMs;}, 0);
+const aggCorrected = correctedMbps(aggBytes, aggElapsed, latency);
+const finalMbps = best.corrected;
+const totalMB = totalBytes / 1048576;
+
 const subtitle = '下载 ' + finalMbps.toFixed(1) + ' Mbps' + (latency!== null? ' · 延迟 ' + latency + ' ms': '');
 const lines = [
 '下载：' + finalMbps.toFixed(1) + ' Mbps（' + (finalMbps / 8).toFixed(1) + ' MB/s）',
+'稳态合计：' + aggCorrected.toFixed(1) + ' Mbps（' + rounds.length + ' 轮合计，已扣连接时间）',
+'各轮：' + rounds.map(function (r) { return r.corrected.toFixed(0);}).join(' / ') + ' Mbps',
 '探针估速：' + probeMbps.toFixed(1) + ' Mbps'
 ];
 if (latency!== null) lines.push('延迟：' + latency + ' ms（1 字节 range 最小值）');
 lines.push('出口：' + exitIp + (loc? '（' + loc + '）': '') + (asn? ' ' + asn: ''));
 if (policy) lines.push('策略：' + policy);
-lines.push('本次流量：约 ' + totalMB.toFixed(1) + ' MB（' + CONCURRENCY + ' 并发，主测每连接 ' + (perConn / 1048576).toFixed(0) + ' MiB）');
-lines.push('注：单轮取样，略低于 fast.com 网页版');
+lines.push('本次流量：约 ' + totalMB.toFixed(1) + ' MB（' + CONCURRENCY + ' 并发 x ' + rounds.length + ' 轮，每连接 ' + (perConn / 1048576).toFixed(0) + ' MiB）');
+lines.push('注：QX 文本 body 解码开销会计入时间，与网页版不会完全相等');
 const plain = lines.join('\n');
-showResult(NAME, subtitle, plain, toHtml(NAME, lines));
+showResult(NAME, subtitle, plain, toHtml(lines));
 } catch (e) {
 const lines = [
 '测速失败',
 String((e && e.message) || e),
 '请确认 QX 已开启、节点可用，且 fast.com / nflxvideo.net 走代理'
 ];
-showResult(NAME, '测速失败', lines.join('\n'), toHtml(NAME, lines));
+showResult(NAME, '测速失败', lines.join('\n'), toHtml(lines));
 }
 }
 
