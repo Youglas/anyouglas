@@ -2,7 +2,7 @@
 ================================================================
 fast_speedtest.js — Quantumult X 用 fast.com 测当前节点下载 + 上传
 @Author: Tuesday
-@Date: 2026-11-01 (v9: 逻辑同 v4，界面按节点阻断检测弹窗样式：左对齐、粗体标签、空行分组、结论区、节点蓝色)
+@Date: 2026-11-01 (v10: 逻辑同 v4，界面对齐排版：表格两栏，标签列等宽，数值列对齐，行距舒适)
 @Description:
 fast.com 网页版的算法（从 fast.com/app-*.js 实测）：
 duration min 5s / max 30s，连接数随速度自适应到 8，
@@ -260,16 +260,20 @@ var plain = '下载: ' + download.toFixed(0) + ' Mbps\n'
 + '📋 测速结论\n\n'
 + verdict + '\n\n'
 + '节点: ' + nodeLine;
-var html = '<p style="text-align: left; font-family: -apple-system; font-size: large">'
-+ '<b>下载:</b> ' + download.toFixed(0) + ' Mbps</br>'
-+ '<b>上传:</b> ' + (upload!== null? upload.toFixed(0) + ' Mbps': '—') + '</br>'
-+ '<b>延迟:</b> ' + (latency!== null? latency + ' ms': '—') + '</br>'
-+ '<b>出口:</b> ' + locationText + '</br>'
-+ '<b>用时:</b> ' + (fparts[0] ? fparts[0].replace('用时 ', '') : '') + '　<b>流量:</b> ' + (fparts[1] ? fparts[1].replace('流量 ', '') : '') + '</br></br>'
-+ '📋 <b>测速结论</b></br></br>'
-+ verdict + '</br></br>'
-+ '<b>节点:</b> <font color="#0A84FF">' + nodeLine + '</font>'
-+ '</p>';
+function row(label, value, boldValue) {
+return '<tr><td style="width:68px; padding:7px 0; vertical-align:top"><b>' + label + ':</b></td><td style="padding:7px 0; vertical-align:top">' + (boldValue ? '<b>' + value + '</b>' : value) + '</td></tr>';
+}
+var html = '<table style="width:100%; border-collapse:collapse; font-family:-apple-system; font-size:16px; line-height:1.5">'
++ row('下载', download.toFixed(0) + ' Mbps', true)
++ row('上传', upload!== null? upload.toFixed(0) + ' Mbps': '—', true)
++ row('延迟', latency!== null? latency + ' ms': '—', false)
++ row('出口', locationText, false)
++ row('用时', fparts[0] ? fparts[0].replace('用时 ', '') : '', false)
++ row('流量', fparts[1] ? fparts[1].replace('流量 ', '') : '', false)
++ '<tr><td colspan="2" style="padding:16px 0 4px">📋 <b>测速结论</b></td></tr>'
++ '<tr><td colspan="2" style="padding:4px 0">' + verdict + '</td></tr>'
++ '<tr><td style="width:68px; padding:10px 0 2px; vertical-align:top"><b>节点:</b></td><td style="padding:10px 0 2px; vertical-align:top"><font color="#0A84FF">' + nodeLine + '</font></td></tr>'
++ '</table>';
 return { plain: plain, html: html };
 }
 function showResult(title, plain, html) {

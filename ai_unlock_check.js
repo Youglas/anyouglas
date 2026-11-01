@@ -2,7 +2,7 @@
 ================================================================
 ai_unlock_check.js — Quantumult X 检测主流 AI 是否已解锁
 @Author: Tuesday
-@Date: 2026-11-01 (v4: 界面按节点阻断检测弹窗样式：左对齐、粗体标签、空行分组、结论区、节点蓝色；逻辑同 v1)
+@Date: 2026-11-01 (v5: 逻辑同 v1，界面对齐排版：列表式，名称+说明在左，状态在右对齐，行距舒适)
 @Description:
 检测当前出口 IP（所选策略/节点）能否打开主流 AI 服务。
 每个服务并行检测，7 秒超时，总时长约 8 秒，不会
@@ -255,14 +255,14 @@ return r.name + ': ' + ICONS[r.status] + ' ' + LABELS[r.status] + ' (' + r.detai
 }).join('\n');
 const plain = rowsPlain + '\n\n📋 检测结论\n\n' + verdict + '\n\n节点: ' + nodeLine;
 const rowsHtml = results.map(function (r) {
-return '<b>' + r.name + ':</b> ' + ICONS[r.status] + ' ' + LABELS[r.status] + ' <font color="#8E8E93">(' + r.detail + ')</font>';
-}).join('</br>');
-const html = '<p style="text-align: left; font-family: -apple-system; font-size: large">'
-+ rowsHtml + '</br></br>'
-+ '📋 <b>检测结论</b></br></br>'
-+ verdict + '</br></br>'
-+ '<b>节点:</b> <font color="#0A84FF">' + nodeLine + '</font>'
-+ '</p>';
+return '<tr><td style="padding:8px 0; vertical-align:middle"><b>' + r.name + '</b><br><font color="#8E8E93" size="2">' + r.detail + '</font></td><td style="padding:8px 0; text-align:right; vertical-align:middle; white-space:nowrap">' + ICONS[r.status] + ' ' + LABELS[r.status] + '</td></tr>';
+}).join('');
+const html = '<table style="width:100%; border-collapse:collapse; font-family:-apple-system; font-size:16px; line-height:1.5">'
++ rowsHtml
++ '<tr><td colspan="2" style="padding:16px 0 4px">📋 <b>检测结论</b></td></tr>'
++ '<tr><td colspan="2" style="padding:4px 0">' + verdict + '</td></tr>'
++ '<tr><td style="padding:10px 0 2px; vertical-align:top"><b>节点:</b></td><td style="padding:10px 0 2px; text-align:right; vertical-align:top"><font color="#0A84FF">' + nodeLine + '</font></td></tr>'
++ '</table>';
 log(NAME + ' | ' + plain);
 if (typeof $done!== 'undefined') {
 try { $done({ title: '🤖 AI 解锁检测', message: plain, htmlMessage: html});}
