@@ -1,0 +1,11 @@
+# NodeLoc 规则集 for Quantumult X
+# 论坛 + 文档站及文档 CDN，全部走代理
+# 域名核实于 2026-11-02：主站 www.nodeloc.com / 文档站 docs.nodeloc.com / static.nodeloc.com 均解析到 Cloudflare (AS13335)；论坛全部资源同域，无外部 CDN；文档图片走 mintcdn.com，文档静态资源走 Mintlify 的 CloudFront 分发
+# 策略名按 Auto（代理组）写，如需直连把 Auto 改成 direct
+
+host-suffix, nodeloc.com, Auto
+host-suffix, mintcdn.com, Auto
+host, d3gk2c5xim1je2.cloudfront.net, Auto
+host-suffix, mintlify.app, Auto
+host-suffix, mintlify.site, Auto
+host-suffix, mintlify.com, Auto
