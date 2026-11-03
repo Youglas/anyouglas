@@ -1,0 +1,12 @@
+{
+  "sites": [
+    {
+      "key": "builtin.hongguo",
+      "name": "红果短剧",
+      "type": 3,
+      "api": "csp_YingxiaHongguo",
+      "searchable": 1,
+      "quickSearch": 1
+    }
+  ]
+}
