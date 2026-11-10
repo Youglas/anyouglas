@@ -1,34 +1,37 @@
-# 抖音 DouYin — 国内直连分流（Shadowrocket）
-# 用法：在配置文件的 [Rule] 里加一行：
-# RULE-SET,https://cdn.jsdelivr.net/gh/Youglas/anyouglas@<commit>/Douyin.list,DIRECT
+# 抖音 DouYin — 分流规则集（Shadowrocket）
+# 用法：在配置文件的 [Proxy Group] 里加一行：
+# 抖音 = select, DIRECT, PROXY
+# 在 [Rule] 里加一行：
+# RULE-SET,https://cdn.jsdelivr.net/gh/Youglas/anyouglas@<commit>/Douyin.list,抖音
+# 注意：本文件里的规则不带策略，策略由引用它的 RULE-SET 行决定
+# （指向 抖音 策略组后，在首页点 抖音 分组可在 DIRECT / PROXY 间切换，默认 DIRECT）
 # 来源：blackmatrix7/ios_rule_script DouYin.list（2025-06-06）+ 抖音常用字节 infra
-# 策略 DIRECT：抖音走本地网络，不走代理
-DOMAIN-SUFFIX,douyin.com,DIRECT
-DOMAIN-SUFFIX,iesdouyin.com,DIRECT
-DOMAIN-SUFFIX,douyincdn.com,DIRECT
-DOMAIN-SUFFIX,douyinpic.com,DIRECT
-DOMAIN-SUFFIX,douyinstatic.com,DIRECT
-DOMAIN-SUFFIX,douyinvod.com,DIRECT
-DOMAIN-SUFFIX,idouyinvod.com,DIRECT
-DOMAIN-SUFFIX,douyinliving.com,DIRECT
-DOMAIN-SUFFIX,amemv.com,DIRECT
-DOMAIN-SUFFIX,snssdk.com,DIRECT
-DOMAIN-SUFFIX,pstatp.com,DIRECT
-DOMAIN-SUFFIX,bytedanceapi.com,DIRECT
-DOMAIN-SUFFIX,bytedance.com,DIRECT
-DOMAIN-SUFFIX,bytecdn.com,DIRECT
-DOMAIN-SUFFIX,bytecdn.cn,DIRECT
-DOMAIN-SUFFIX,byteimg.com,DIRECT
-DOMAIN-SUFFIX,bytegecko.com,DIRECT
-DOMAIN-SUFFIX,bytednsdoc.com,DIRECT
-DOMAIN-SUFFIX,toutiaocloud.cn,DIRECT
-DOMAIN-SUFFIX,volces.com,DIRECT
-DOMAIN-SUFFIX,zijieapi.com,DIRECT
-DOMAIN-SUFFIX,zjcdn.com,DIRECT
-DOMAIN-SUFFIX,ecombdapi.com,DIRECT
-DOMAIN-SUFFIX,ecombdimg.com,DIRECT
-DOMAIN-SUFFIX,ecombdstatic.com,DIRECT
-DOMAIN-SUFFIX,toutiao.com,DIRECT
-DOMAIN-SUFFIX,ixigua.com,DIRECT
-DOMAIN-SUFFIX,ixiguavideo.com,DIRECT
-DOMAIN-KEYWORD,douyin,DIRECT
+DOMAIN-SUFFIX,douyin.com
+DOMAIN-SUFFIX,iesdouyin.com
+DOMAIN-SUFFIX,douyincdn.com
+DOMAIN-SUFFIX,douyinpic.com
+DOMAIN-SUFFIX,douyinstatic.com
+DOMAIN-SUFFIX,douyinvod.com
+DOMAIN-SUFFIX,idouyinvod.com
+DOMAIN-SUFFIX,douyinliving.com
+DOMAIN-SUFFIX,amemv.com
+DOMAIN-SUFFIX,snssdk.com
+DOMAIN-SUFFIX,pstatp.com
+DOMAIN-SUFFIX,bytedanceapi.com
+DOMAIN-SUFFIX,bytedance.com
+DOMAIN-SUFFIX,bytecdn.com
+DOMAIN-SUFFIX,bytecdn.cn
+DOMAIN-SUFFIX,byteimg.com
+DOMAIN-SUFFIX,bytegecko.com
+DOMAIN-SUFFIX,bytednsdoc.com
+DOMAIN-SUFFIX,toutiaocloud.cn
+DOMAIN-SUFFIX,volces.com
+DOMAIN-SUFFIX,zijieapi.com
+DOMAIN-SUFFIX,zjcdn.com
+DOMAIN-SUFFIX,ecombdapi.com
+DOMAIN-SUFFIX,ecombdimg.com
+DOMAIN-SUFFIX,ecombdstatic.com
+DOMAIN-SUFFIX,toutiao.com
+DOMAIN-SUFFIX,ixigua.com
+DOMAIN-SUFFIX,ixiguavideo.com
+DOMAIN-KEYWORD,douyin
