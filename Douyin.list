@@ -1,0 +1,34 @@
+# 抖音 DouYin — 国内直连分流（Shadowrocket）
+# 用法：在配置文件的 [Rule] 里加一行：
+# RULE-SET,https://cdn.jsdelivr.net/gh/Youglas/anyouglas@<commit>/Douyin.list,DIRECT
+# 来源：blackmatrix7/ios_rule_script DouYin.list（2025-06-06）+ 抖音常用字节 infra
+# 策略 DIRECT：抖音走本地网络，不走代理
+DOMAIN-SUFFIX,douyin.com,DIRECT
+DOMAIN-SUFFIX,iesdouyin.com,DIRECT
+DOMAIN-SUFFIX,douyincdn.com,DIRECT
+DOMAIN-SUFFIX,douyinpic.com,DIRECT
+DOMAIN-SUFFIX,douyinstatic.com,DIRECT
+DOMAIN-SUFFIX,douyinvod.com,DIRECT
+DOMAIN-SUFFIX,idouyinvod.com,DIRECT
+DOMAIN-SUFFIX,douyinliving.com,DIRECT
+DOMAIN-SUFFIX,amemv.com,DIRECT
+DOMAIN-SUFFIX,snssdk.com,DIRECT
+DOMAIN-SUFFIX,pstatp.com,DIRECT
+DOMAIN-SUFFIX,bytedanceapi.com,DIRECT
+DOMAIN-SUFFIX,bytedance.com,DIRECT
+DOMAIN-SUFFIX,bytecdn.com,DIRECT
+DOMAIN-SUFFIX,bytecdn.cn,DIRECT
+DOMAIN-SUFFIX,byteimg.com,DIRECT
+DOMAIN-SUFFIX,bytegecko.com,DIRECT
+DOMAIN-SUFFIX,bytednsdoc.com,DIRECT
+DOMAIN-SUFFIX,toutiaocloud.cn,DIRECT
+DOMAIN-SUFFIX,volces.com,DIRECT
+DOMAIN-SUFFIX,zijieapi.com,DIRECT
+DOMAIN-SUFFIX,zjcdn.com,DIRECT
+DOMAIN-SUFFIX,ecombdapi.com,DIRECT
+DOMAIN-SUFFIX,ecombdimg.com,DIRECT
+DOMAIN-SUFFIX,ecombdstatic.com,DIRECT
+DOMAIN-SUFFIX,toutiao.com,DIRECT
+DOMAIN-SUFFIX,ixigua.com,DIRECT
+DOMAIN-SUFFIX,ixiguavideo.com,DIRECT
+DOMAIN-KEYWORD,douyin,DIRECT
