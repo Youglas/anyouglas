@@ -1,52 +1,19 @@
 /*
-脚本名称：cd.sd 嗅探
-
-活动入口：cd.sd 农场签到/采菜/偷菜接口嗅探
-
-规则：登录后点一次签到、一次采菜、一次偷菜，脚本记录接口和 Cookie
-
-环境变量：cd_cookie（QX 环境，多账号以@隔开）、cd_probe（记录的接口）
-
-使用说明：把这个 .js 链接作为资源加进 QX（不要开 Resource Parser），下面的重写和 MITM 会一起导进来；导入后登录 cd.sd，点一次签到、一次采菜、一次偷菜，把弹出的通知截图发我；用完可删
-
-更新时间：2026-11-20
-
-
-================ Surge 配置 ================
-
-[MITM]
-
-hostname = %APPEND% cd.sd
-
-
-[Script]
-
-cd嗅探 = type=http-request, pattern=^https://cd\.sd/.*, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas/cd_sd_sniffer.js
-
-
-============ Quantumult X 配置 =============
-
-[MITM]
-
-hostname = %APPEND% cd.sd
-
+cd.sd 嗅探脚本（QX 专用，一次性探针）
+用途：cd.sd 的签到/农场接口在登录后才能看到，从外面探不到。
+这个脚本只做两件事：① 存登录 Cookie；② 把你点的签到/采菜/偷菜请求的
+方法+路径+参数记下来并弹通知，你把通知截图发我，我就按真实接口写正式脚本。
+登录请求不记 body（里面有密码）。
+导入：把这个 .js 链接作为资源加进 QX（不要开 Resource Parser），下面的重写和 MITM 会一起导进来，用完可删。
 
 [rewrite_local]
-
 ^https://cd\.sd/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas/cd_sd_sniffer.js, tag=cd嗅探, enabled=true
 
-
-============ Loon 配置 =============
-
-[MITM]
-
+[mitm]
 hostname = cd.sd
-
-
-[Rewrite]
-
-^https://cd\.sd/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas/cd_sd_sniffer.js, tag=cd嗅探, enabled=true
 */
+
+
 
 const $ = new Env('cd 嗅探');
 
