@@ -9,7 +9,7 @@
 
 环境变量：noyc_cookie（QX 环境，多账号以@隔开）
 
-使用说明：添加重写规则后，在 Safari 登录账号并手动点一次签到即可获取 Cookie 和 CSRF Token；任务会在签到前先试存的 Token，遇到 CSRF 报错自动刷新页面取新 Token 再试一次
+使用说明：添加重写规则后，在 Safari 登录账号并手动点一次签到即可获取 Cookie 和 CSRF Token；任务会在签到前先试存的 Token，遇到 CSRF 报错自动刷新页面取新 Token 再试一次；Cookie 过期或 Token 坏了且刷新不到新的账号会自动清理
 
 更新时间：2026-11-20
 
@@ -23,9 +23,9 @@ hostname = %APPEND% go.noyc.eu
 
 [Script]
 
-获取草丛Cookie = type=http-request, pattern=^https:\/\/go\.noyc\.eu\/api\/checkin, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d49e3db8fc30477810756cb48f330fe7699144a4/noyc_checkin_v2.js
+获取草丛Cookie = type=http-request, pattern=^https:\/\/go\.noyc\.eu\/api\/checkin, requires-body=1, max-size=0, script-path=__PINNED_URL__
 
-草丛签到 = type=cron, cronexp=0 9 * * *, timeout=60, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d49e3db8fc30477810756cb48f330fe7699144a4/noyc_checkin_v2.js, script-update-interval=0
+草丛签到 = type=cron, cronexp=0 9 * * *, timeout=60, script-path=__PINNED_URL__, script-update-interval=0
 
 
 ============ Quantumult X 配置 =============
@@ -37,12 +37,12 @@ hostname = %APPEND% go.noyc.eu
 
 [rewrite_local]
 
-^https:\/\/go\.noyc\.eu\/api\/checkin url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d49e3db8fc30477810756cb48f330fe7699144a4/noyc_checkin_v2.js
+^https:\/\/go\.noyc\.eu\/api\/checkin url script-request-body __PINNED_URL__
 
 
 [task_local]
 
-0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d49e3db8fc30477810756cb48f330fe7699144a4/noyc_checkin_v2.js, tag=草丛签到, enabled=true
+0 9 * * * __PINNED_URL__, tag=草丛签到, enabled=true
 
 
 ================ Loon 配置 ================
@@ -51,9 +51,9 @@ hostname = %APPEND% go.noyc.eu
 
 hostname = go.noyc.eu
 
-cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d49e3db8fc30477810756cb48f330fe7699144a4/noyc_checkin_v2.js, tag=草丛签到
+cron "0 9 * * *" script-path=__PINNED_URL__, tag=草丛签到
 
-http-request ^https:\/\/go\.noyc\.eu\/api\/checkin script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d49e3db8fc30477810756cb48f330fe7699144a4/noyc_checkin_v2.js, requires-body=true, timeout=10, enabled=false, tag=获取草丛Cookie
+http-request ^https:\/\/go\.noyc\.eu\/api\/checkin script-path=__PINNED_URL__, requires-body=true, timeout=10, enabled=false, tag=获取草丛Cookie
 
 */
 
@@ -127,6 +127,7 @@ const Api = {
 // 脚本入口函数
 
 async function main() {
+  let pruneIdx = [];
   for (let i = 0; i < cookieArr.length; i++) {
     console.log(`账号[${i + 1}]开始执行`);
 
@@ -146,10 +147,25 @@ async function main() {
     await $.wait(1000 * 1);
 
     // 拼接通知消息
-    $.messages.push(`账号[${i + 1}] ${$.result.replace(/\n$/, '')}`);
+    $.messages.push(`账号[${i + 1}] ${$.result.replace(/\n$/, '')}${$.prune ? '（已清理）' : ''}`);
+    if ($.prune) pruneIdx.push(i);
 
     // 每个账号间隔 3 秒
     await $.wait(1000 * 3);
+  }
+
+  // 清理失效账号（过期、或 Token 坏了且刷新也拿不到新 Token 的）
+  if (pruneIdx.length) {
+    pruneIdx.sort((a, b) => b - a);
+    for (let idx of pruneIdx) {
+      cookieArr.splice(idx, 1);
+      csrfArr.splice(idx, 1);
+    }
+    cookie = cookieArr.join('@');
+    csrf = csrfArr.join('@');
+    $.setdata(cookie, noyc_cookie_key);
+    $.setdata(csrf, noyc_csrf_key);
+    $.messages.push(`🧹 已清理 ${pruneIdx.length} 个失效账号，剩余 ${cookieArr.length} 个，请重新抓取失效的账号`);
   }
 }
 
@@ -201,6 +217,7 @@ function GetCookie() {
 
 // 签到
 async function checkin() {
+  $.prune = false;
   let info = parseCsrfInfo(csrfArr[$.idx] || '');
   let result = await doCheckin(info);
   debug(result, "checkin");
@@ -221,6 +238,9 @@ async function checkin() {
     }
   }
 
+  // 还是 CSRF 报错：存的 Token 坏了且刷新也拿不到新的，这个账号没法跑了，标记清理
+  if (isCsrfError(result)) $.prune = true;
+
   if (result && typeof result === 'object') {
     let m = result.message || result.msg || result.error || result.data || '';
     if (m && typeof m === 'string') {
@@ -235,6 +255,7 @@ async function checkin() {
   } else if (typeof result === 'string' && result) {
     if (result.indexOf('/auth/login') !== -1 || result.indexOf('<html') !== -1) {
       $.result += `Cookie 已过期，请重新抓取\n`;
+      $.prune = true;
     } else {
       $.result += `${result.slice(0, 40)}\n`;
     }
@@ -291,7 +312,9 @@ async function refreshToken() {
     || html.match(/<input[^>]*name=["'](?:_token|csrf_token)["'][^>]*value=["']([^"']+)["']/i)
     || html.match(/<input[^>]*value=["']([^"']+)["'][^>]*name=["'](?:_token|csrf_token)["']/i)
     || html.match(/["']csrf[-_]?token["']\s*[:=]\s*["']([^"']+)["']/i)
-    || html.match(/["']_token["']\s*[:=]\s*["']([^"']+)["']/i);
+    || html.match(/["']_token["']\s*[:=]\s*["']([^"']+)["']/i)
+    || html.match(/csrfToken\s*[:=]\s*["']([^"']+)["']/i)
+    || html.match(/(?:csrf_token|_token)\s*[:=]\s*["']([^"']+)["']/i);
   return m ? m[1] : '';
 }
 
