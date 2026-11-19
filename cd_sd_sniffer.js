@@ -11,10 +11,10 @@ cd.sd 的签到/农场接口在登录后才能看到，从外面探不到。
 用完可删。
 
 [rewrite_local]
-^https://cd\.sd/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas/cd_sd_sniffer.js
+^https://cd\.sd/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@2253b2a562fec699346999252d934461f9fb2bdb/cd_sd_sniffer.js
 
 [task_local]
-0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas/cd_sd_sniffer.js, tag=cd 嗅探, enabled=true
+0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@2253b2a562fec699346999252d934461f9fb2bdb/cd_sd_sniffer.js, tag=cd 嗅探, enabled=true
 
 [MITM]
 hostname = %APPEND% cd.sd
