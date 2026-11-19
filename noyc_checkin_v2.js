@@ -23,9 +23,9 @@ hostname = %APPEND% go.noyc.eu
 
 [Script]
 
-获取草丛Cookie = type=http-request, pattern=^https:\/\/go\.noyc\.eu\/api\/checkin, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@05e3f3ad0aaa1a0608e7bec4057366cd36afb0c7/noyc_checkin_v2.js
+获取草丛Cookie = type=http-request, pattern=^https:\/\/go\.noyc\.eu\/api\/checkin, requires-body=1, max-size=0, script-path=__PINNED_URL__
 
-草丛签到 = type=cron, cronexp=0 9 * * *, timeout=60, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@05e3f3ad0aaa1a0608e7bec4057366cd36afb0c7/noyc_checkin_v2.js, script-update-interval=0
+草丛签到 = type=cron, cronexp=0 9 * * *, timeout=60, script-path=__PINNED_URL__, script-update-interval=0
 
 
 ============ Quantumult X 配置 =============
@@ -37,12 +37,12 @@ hostname = %APPEND% go.noyc.eu
 
 [rewrite_local]
 
-^https:\/\/go\.noyc\.eu\/api\/checkin url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@05e3f3ad0aaa1a0608e7bec4057366cd36afb0c7/noyc_checkin_v2.js
+^https:\/\/go\.noyc\.eu\/api\/checkin url script-request-body __PINNED_URL__
 
 
 [task_local]
 
-0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@05e3f3ad0aaa1a0608e7bec4057366cd36afb0c7/noyc_checkin_v2.js, tag=草丛签到, enabled=true
+0 9 * * * __PINNED_URL__, tag=草丛签到, enabled=true
 
 
 ================ Loon 配置 ================
@@ -51,9 +51,9 @@ hostname = %APPEND% go.noyc.eu
 
 hostname = go.noyc.eu
 
-cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@05e3f3ad0aaa1a0608e7bec4057366cd36afb0c7/noyc_checkin_v2.js, tag=草丛签到
+cron "0 9 * * *" script-path=__PINNED_URL__, tag=草丛签到
 
-http-request ^https:\/\/go\.noyc\.eu\/api\/checkin script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@05e3f3ad0aaa1a0608e7bec4057366cd36afb0c7/noyc_checkin_v2.js, requires-body=true, timeout=10, enabled=false, tag=获取草丛Cookie
+http-request ^https:\/\/go\.noyc\.eu\/api\/checkin script-path=__PINNED_URL__, requires-body=true, timeout=10, enabled=false, tag=获取草丛Cookie
 
 */
 
@@ -181,7 +181,9 @@ async function checkin() {
     } else if (result.success === true || result.ret === 1 || result.code === 0) {
       $.result += `签到成功\n`;
     } else {
-      $.result += `签到未成功\n`;
+      // 无法识别的返回：把原始内容打出来，方便定位原因
+      let raw = $.toStr(result) || '';
+      $.result += `签到未成功：${raw.slice(0, 150)}\n`;
     }
   } else if (typeof result === 'string' && result) {
     if (result.indexOf('/auth/login') !== -1 || result.indexOf('<html') !== -1) {
@@ -190,7 +192,7 @@ async function checkin() {
       $.result += `${result.slice(0, 40)}\n`;
     }
   } else {
-    $.result += `签到未成功\n`;
+    $.result += `请求失败或返回为空\n`;
   }
 }
 
