@@ -3,7 +3,7 @@
 #!author=Youglas
 
 [rewrite_local]
-^https://cd\.sd/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@4b3848efd2dac789ccedc9d788671685a46cfe7c/cd_sd_sniffer.js, tag=cd嗅探, enabled=true
+^https://cd\.sd/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@ec6c31477a1fcff9aa6a9d1921a1e6830bf8d360/cd_sd_sniffer.js, tag=cd嗅探, enabled=true
 
 [mitm]
 hostname = %APPEND% cd.sd
