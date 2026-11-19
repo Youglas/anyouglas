@@ -3,7 +3,13 @@
 // 这个脚本只做两件事：① 存登录 Cookie；② 把你点的签到/采菜/偷菜请求的
 // 方法+路径+参数记下来并弹通知，你把通知截图发我，我就按真实接口写正式脚本。
 // 登录请求不记 body（里面有密码）。
-// 配置见下发的卡片（rewrite + mitm），用完可删。
+// 导入：把这个 .js 链接粘贴到 QX 资源解析器，下面的重写和 MITM 会一起导进来，用完可删。
+//
+// [rewrite_local]
+// ^https://cd\.sd/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas/cd_sd_sniffer.js, tag=cd嗅探, enabled=true
+//
+// [mitm]
+// hostname = cd.sd
 
 const COOKIE_KEY = 'cd_cookie';
 const PROBE_KEY = 'cd_probe';
