@@ -9,7 +9,7 @@
 
 环境变量：noyc_cookie（QX 环境，多账号以@隔开）
 
-使用说明：添加重写规则后，在 Safari 登录账号并手动点一次签到即可获取 Cookie
+使用说明：添加重写规则后，在 Safari 登录账号并手动点一次签到即可获取 Cookie 和 CSRF Token；任务会在签到前先试存的 Token，遇到 CSRF 报错自动刷新页面取新 Token 再试一次
 
 更新时间：2026-11-20
 
@@ -23,9 +23,9 @@ hostname = %APPEND% go.noyc.eu
 
 [Script]
 
-获取草丛Cookie = type=http-request, pattern=^https:\/\/go\.noyc\.eu\/api\/checkin, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@9c2f6012d2b172b5d7b8a6b38c1130cf24929f50/noyc_checkin_v2.js
+获取草丛Cookie = type=http-request, pattern=^https:\/\/go\.noyc\.eu\/api\/checkin, requires-body=1, max-size=0, script-path=__PINNED_URL__
 
-草丛签到 = type=cron, cronexp=0 9 * * *, timeout=60, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@9c2f6012d2b172b5d7b8a6b38c1130cf24929f50/noyc_checkin_v2.js, script-update-interval=0
+草丛签到 = type=cron, cronexp=0 9 * * *, timeout=60, script-path=__PINNED_URL__, script-update-interval=0
 
 
 ============ Quantumult X 配置 =============
@@ -37,12 +37,12 @@ hostname = %APPEND% go.noyc.eu
 
 [rewrite_local]
 
-^https:\/\/go\.noyc\.eu\/api\/checkin url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@9c2f6012d2b172b5d7b8a6b38c1130cf24929f50/noyc_checkin_v2.js
+^https:\/\/go\.noyc\.eu\/api\/checkin url script-request-body __PINNED_URL__
 
 
 [task_local]
 
-0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@9c2f6012d2b172b5d7b8a6b38c1130cf24929f50/noyc_checkin_v2.js, tag=草丛签到, enabled=true
+0 9 * * * __PINNED_URL__, tag=草丛签到, enabled=true
 
 
 ================ Loon 配置 ================
@@ -51,9 +51,9 @@ hostname = %APPEND% go.noyc.eu
 
 hostname = go.noyc.eu
 
-cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@9c2f6012d2b172b5d7b8a6b38c1130cf24929f50/noyc_checkin_v2.js, tag=草丛签到
+cron "0 9 * * *" script-path=__PINNED_URL__, tag=草丛签到
 
-http-request ^https:\/\/go\.noyc\.eu\/api\/checkin script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@9c2f6012d2b172b5d7b8a6b38c1130cf24929f50/noyc_checkin_v2.js, requires-body=true, timeout=10, enabled=false, tag=获取草丛Cookie
+http-request ^https:\/\/go\.noyc\.eu\/api\/checkin script-path=__PINNED_URL__, requires-body=true, timeout=10, enabled=false, tag=获取草丛Cookie
 
 */
 
@@ -66,6 +66,8 @@ const origin = 'https://go.noyc.eu';
 
 const noyc_cookie_key = 'noyc_cookie';
 
+const noyc_csrf_key = 'noyc_csrf';  // 每账号的 CSRF 信息（请求头 + 请求体 + URL 参数），与 noyc_cookie 按下标对应
+
 const Notify = 1;  // 0 为关闭通知, 1 为打开通知, 默认为 1
 
 $.messages = [];  // 为通知准备的空数组
@@ -76,6 +78,8 @@ $.messages = [];  // 为通知准备的空数组
 $.is_debug = ($.isNode() ? process.env.IS_DEBUG : $.getdata('is_debug')) || 'false';  // 调试模式
 
 let cookie = ($.isNode() ? process.env.noyc_cookie : $.getdata(noyc_cookie_key)) || '', cookieArr = [];
+
+let csrf = ($.isNode() ? process.env.noyc_csrf : $.getdata(noyc_csrf_key)) || '', csrfArr = [];
 
 
 // 统一管理 api 接口
@@ -130,6 +134,7 @@ async function main() {
     $.message = '';
     $.result = '';
     $.cookie = cookieArr[i];
+    $.idx = i;
 
     // 签到
     await checkin();
@@ -155,14 +160,39 @@ function GetCookie() {
     let headers = $request.headers;
     let ck = headers['Cookie'] || headers['cookie'] || '';
     if (ck) {
+      // 连 CSRF Token 一起抓：请求头里含 csrf/xsrf/token 的字段 + 请求体 + URL 参数
+      let csrfHeaders = {};
+      for (let k in headers) {
+        if (/csrf|xsrf|token/i.test(k) && k.toLowerCase() !== 'cookie') {
+          csrfHeaders[k] = headers[k];
+        }
+      }
+      let body = (typeof $request.body === 'string') ? $request.body : '';
+      let q = '';
+      if ($request.url) {
+        let qi = $request.url.indexOf('?');
+        if (qi !== -1) q = $request.url.slice(qi);
+      }
+      let info = encodeURIComponent(JSON.stringify({ h: csrfHeaders, b: body, q: q }));
       let arr = cookie ? cookie.split('@') : [];
-      if (arr.indexOf(ck) === -1) {
+      let cArr = csrf ? csrf.split('@') : [];
+      while (cArr.length < arr.length) cArr.push('');
+      let idx = arr.indexOf(ck);
+      if (idx === -1) {
         cookie ? cookie += `@${ck}` : cookie += `${ck}`;
+        cArr.push(info);
+        csrf = cArr.join('@');
         $.setdata(cookie, noyc_cookie_key);
+        $.setdata(csrf, noyc_csrf_key);
         console.log(`Cookie: ${hideSensitiveData(ck, 6, 6)} \n`);
         $.messages.push(`🎉 Cookie 写入成功（共 ${cookie.split('@').length} 个账号）`);
       } else {
-        console.log(`❌ 该账号 Cookie 已存在\n`);
+        // 已存在的账号：更新它的 Token 信息
+        cArr[idx] = info;
+        csrf = cArr.join('@');
+        $.setdata(csrf, noyc_csrf_key);
+        console.log(`❌ 该账号 Cookie 已存在，已更新 Token\n`);
+        $.messages.push(`🔄 账号[${idx + 1}] Token 已更新`);
       }
     }
   }
@@ -171,11 +201,28 @@ function GetCookie() {
 
 // 签到
 async function checkin() {
-  let result = await httpRequest(options(Api.checkin.url, '', { 'Cookie': $.cookie }));
+  let info = parseCsrfInfo(csrfArr[$.idx] || '');
+  let result = await doCheckin(info);
   debug(result, "checkin");
 
+  // CSRF 报错：刷新页面取新 Token，再试一次
+  if (isCsrfError(result)) {
+    let fresh = await refreshToken();
+    if (fresh) {
+      let info2 = applyFreshToken(info, fresh);
+      result = await doCheckin(info2);
+      debug(result, "checkin-retry");
+      // 重试过了 CSRF 校验：把新 Token 存下来
+      if (!isCsrfError(result)) {
+        csrfArr[$.idx] = encodeURIComponent(JSON.stringify(info2));
+        csrf = csrfArr.join('@');
+        $.setdata(csrf, noyc_csrf_key);
+      }
+    }
+  }
+
   if (result && typeof result === 'object') {
-    let m = result.message || result.msg || result.data || '';
+    let m = result.message || result.msg || result.error || result.data || '';
     if (m && typeof m === 'string') {
       $.result += `${m}\n`;
     } else if (result.success === true || result.ret === 1 || result.code === 0) {
@@ -197,10 +244,97 @@ async function checkin() {
 }
 
 
+// 解析存的 CSRF 信息
+function parseCsrfInfo(s) {
+  let info = { h: {}, b: '', q: '' };
+  if (s) {
+    try {
+      let o = JSON.parse(decodeURIComponent(s));
+      if (o && typeof o === 'object') {
+        info.h = o.h || {};
+        info.b = o.b || '';
+        info.q = o.q || '';
+      }
+    } catch (e) { }
+  }
+  return info;
+}
+
+
+// 发一次签到请求（带存的 Token）
+async function doCheckin(info) {
+  let url = Api.checkin.url + (info.q || '');
+  let extra = Object.assign({}, info.h, { 'Cookie': $.cookie });
+  let body = info.b || '';
+  return await httpRequest(options(url, body, extra));
+}
+
+
+// 是否 CSRF 报错
+function isCsrfError(result) {
+  if (!result) return false;
+  let s = (typeof result === 'string') ? result : $.toStr(result);
+  return /csrf/i.test(s || '');
+}
+
+
+// 刷新页面取新 Token
+async function refreshToken() {
+  let html = await new Promise((resolve) => {
+    $.get({ url: `${origin}/`, headers: { 'Cookie': $.cookie, 'Accept': 'text/html', 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' }, timeout: 10000 }, (err, resp, data) => {
+      if (err) { console.log(`❌ 刷新页面失败`); $.logErr(err); resolve(''); }
+      else resolve(data || '');
+    });
+  });
+  if (!html || typeof html !== 'string') return '';
+  let m = html.match(/<meta[^>]*name=["']csrf-token["'][^>]*content=["']([^"']+)["']/i)
+    || html.match(/<input[^>]*name=["'](?:_token|csrf_token)["'][^>]*value=["']([^"']+)["']/i)
+    || html.match(/<input[^>]*value=["']([^"']+)["'][^>]*name=["'](?:_token|csrf_token)["']/i)
+    || html.match(/["']csrf[-_]?token["']\s*[:=]\s*["']([^"']+)["']/i)
+    || html.match(/["']_token["']\s*[:=]\s*["']([^"']+)["']/i);
+  return m ? m[1] : '';
+}
+
+
+// 把新 Token 填进原来放 Token 的位置
+function applyFreshToken(info, fresh) {
+  let out = { h: Object.assign({}, info.h), b: info.b || '', q: info.q || '' };
+  let replaced = false;
+  for (let k in out.h) {
+    if (/csrf|xsrf|token/i.test(k)) { out.h[k] = fresh; replaced = true; }
+  }
+  if (out.b) {
+    try {
+      let obj = JSON.parse(out.b);
+      if (obj && typeof obj === 'object') {
+        for (let k in obj) {
+          if (/csrf|xsrf|token/i.test(k)) { obj[k] = fresh; replaced = true; }
+        }
+        out.b = JSON.stringify(obj);
+      }
+    } catch (e) {
+      let nb = out.b.replace(/((?:_token|csrf_token|csrf-token)=)[^&]*/gi, '$1' + encodeURIComponent(fresh));
+      if (nb !== out.b) { out.b = nb; replaced = true; }
+    }
+  }
+  if (out.q) {
+    let nq = out.q.replace(/((?:_token|csrf_token|csrf-token)=)[^&]*/gi, '$1' + encodeURIComponent(fresh));
+    if (nq !== out.q) { out.q = nq; replaced = true; }
+  }
+  if (!replaced) {
+    // 原请求里没找到放 Token 的位置：按最常见的方式补一个请求头
+    out.h['X-CSRF-TOKEN'] = fresh;
+  }
+  return out;
+}
+
+
 // 检查变量
 async function checkEnv() {
   // 多账号分割
   cookieArr = cookie.split('@');
+  csrfArr = csrf ? csrf.split('@') : [];
+  while (csrfArr.length < cookieArr.length) csrfArr.push('');
 
   // 当下标0为空字符串也会占用长度，所以需判断是否为空字符串
   if (cookieArr[0]) {
