@@ -23,9 +23,9 @@ hostname = %APPEND% go.noyc.eu
 
 [Script]
 
-获取草丛Cookie = type=http-request, pattern=^https:\/\/go\.noyc\.eu\/api\/checkin, requires-body=1, max-size=0, script-path=__PINNED_URL__
+获取草丛Cookie = type=http-request, pattern=^https:\/\/go\.noyc\.eu\/api\/checkin, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@071e5d34ace17ac9bd89c3863b5787d5173a8fc7/noyc_checkin_v2.js
 
-草丛签到 = type=cron, cronexp=0 9 * * *, timeout=60, script-path=__PINNED_URL__, script-update-interval=0
+草丛签到 = type=cron, cronexp=0 9 * * *, timeout=60, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@071e5d34ace17ac9bd89c3863b5787d5173a8fc7/noyc_checkin_v2.js, script-update-interval=0
 
 
 ============ Quantumult X 配置 =============
@@ -37,12 +37,12 @@ hostname = %APPEND% go.noyc.eu
 
 [rewrite_local]
 
-^https:\/\/go\.noyc\.eu\/api\/checkin url script-request-body __PINNED_URL__
+^https:\/\/go\.noyc\.eu\/api\/checkin url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@071e5d34ace17ac9bd89c3863b5787d5173a8fc7/noyc_checkin_v2.js
 
 
 [task_local]
 
-0 9 * * * __PINNED_URL__, tag=草丛签到, enabled=true
+0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@071e5d34ace17ac9bd89c3863b5787d5173a8fc7/noyc_checkin_v2.js, tag=草丛签到, enabled=true
 
 
 ================ Loon 配置 ================
@@ -51,9 +51,9 @@ hostname = %APPEND% go.noyc.eu
 
 hostname = go.noyc.eu
 
-cron "0 9 * * *" script-path=__PINNED_URL__, tag=草丛签到
+cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@071e5d34ace17ac9bd89c3863b5787d5173a8fc7/noyc_checkin_v2.js, tag=草丛签到
 
-http-request ^https:\/\/go\.noyc\.eu\/api\/checkin script-path=__PINNED_URL__, requires-body=true, timeout=10, enabled=false, tag=获取草丛Cookie
+http-request ^https:\/\/go\.noyc\.eu\/api\/checkin script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@071e5d34ace17ac9bd89c3863b5787d5173a8fc7/noyc_checkin_v2.js, requires-body=true, timeout=10, enabled=false, tag=获取草丛Cookie
 
 */
 
