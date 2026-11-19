@@ -1,0 +1,9 @@
+#!name=cd.sd 嗅探
+#!desc=抓 cd.sd 签到/采菜/偷菜接口（一次性探针）
+#!author=Youglas
+
+[rewrite_local]
+^https://cd\.sd/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@4b3848efd2dac789ccedc9d788671685a46cfe7c/cd_sd_sniffer.js, tag=cd嗅探, enabled=true
+
+[mitm]
+hostname = %APPEND% cd.sd
