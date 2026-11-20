@@ -1,17 +1,17 @@
 /*
 脚本名称：cd 农场签到
 
-活动入口：cd.sd 农场（大姨子的诱惑）签到 + 采菜 + 偷菜
+活动入口：cd.sd 农场（大姨子的诱惑）签到 + 采菜
 
-签到规则：每天 9:00 自动跑：签到 → 采菜 → 偷菜
+签到规则：每天 9:00 自动跑：签到 → 采菜（种菜待抓接口后补）
 
 活动奖励：以网站返回为准
 
 环境变量：cd_cookie（QX 环境，多账号以@隔开）
 
-使用说明：添加重写规则后，在浏览器登录 cd.sd 并手动点一次签到/采菜/偷菜即可获取 Cookie；任务每天 9:00 自动执行。采菜地块在 HARVEST_SLOTS 里改，偷菜目标在 STEAL_LIST 里改（格式 victimId:slot，多个用逗号隔开）。抓到 Cookie 后可删掉 cd 嗅探。
+使用说明：添加重写规则后，在浏览器登录 cd.sd 并手动点一次签到/采菜即可获取 Cookie；任务每天 9:00 自动执行。采菜地块在 HARVEST_SLOTS 里改。过期 Cookie 自动清理（接口返回登录过期/未登录/401/403 时清理）。抓到 Cookie 后可删掉 cd 嗅探。
 
-更新时间：2026-11-20
+更新时间：2026-11-20 (v2 去偷菜，修自动清 Cookie)
 
 
 ================ Surge 配置 ================
@@ -23,9 +23,9 @@ hostname = %APPEND% cd.sd
 
 [Script]
 
-获取cd农场Cookie = type=http-request, pattern=^https:\/\/cd\.sd\/(api|farm\/api)\/.*, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@34f9e7ad3998475c71c6992fd86eca9f7f91d241/cd_farm_checkin.js
+获取cd农场Cookie = type=http-request, pattern=^https:\/\/cd\.sd\/(api|farm\/api)\/.*, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js
 
-cd农场签到 = type=cron, cronexp=0 9 * * *, timeout=120, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@34f9e7ad3998475c71c6992fd86eca9f7f91d241/cd_farm_checkin.js, script-update-interval=0
+cd农场签到 = type=cron, cronexp=0 9 * * *, timeout=120, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, script-update-interval=0
 
 
 ============ Quantumult X 配置 =============
@@ -37,12 +37,12 @@ hostname = %APPEND% cd.sd
 
 [rewrite_local]
 
-^https://cd\.sd/(api|farm/api)/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@34f9e7ad3998475c71c6992fd86eca9f7f91d241/cd_farm_checkin.js
+^https://cd\.sd/(api|farm/api)/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js
 
 
 [task_local]
 
-0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@34f9e7ad3998475c71c6992fd86eca9f7f91d241/cd_farm_checkin.js, tag=cd 农场签到, enabled=true
+0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, tag=cd 农场签到, enabled=true
 
 
 ================ Loon 配置 ================
@@ -51,9 +51,9 @@ hostname = %APPEND% cd.sd
 
 hostname = cd.sd
 
-cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@34f9e7ad3998475c71c6992fd86eca9f7f91d241/cd_farm_checkin.js, tag=cd 农场签到
+cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, tag=cd 农场签到
 
-http-request ^https://cd\.sd/(api|farm/api)/.* script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@34f9e7ad3998475c71c6992fd86eca9f7f91d241/cd_farm_checkin.js, requires-body=true, timeout=10, enabled=false, tag=获取cd农场Cookie
+http-request ^https://cd\.sd/(api|farm/api)/.* script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, requires-body=true, timeout=10, enabled=false, tag=获取cd农场Cookie
 
 */
 
@@ -80,9 +80,6 @@ let cookie = ($.isNode() ? process.env.cd_cookie : $.getdata(cd_cookie_key)) || 
 // 采菜地块（逗号隔开，按需改）
 const HARVEST_SLOTS = "0,1,2,3,4,5";
 
-// 偷菜目标（格式 victimId:slot，多个用逗号隔开，按需改）
-const STEAL_LIST = "837:2,949:1,147:1,376:3,96:3,324:0";
-
 
 // 统一管理 api 接口
 
@@ -96,11 +93,6 @@ const Api = {
   // 采菜
   "harvest": {
     "url": "/farm/api/harvest",
-  },
-
-  // 偷菜
-  "steal": {
-    "url": "/farm/api/steal",
   }
 
 }
@@ -156,9 +148,6 @@ async function main() {
     // 采菜
     await doHarvest();
 
-    // 偷菜
-    await doSteal();
-
     // 打印结果
     console.log($.result);
 
@@ -213,7 +202,7 @@ async function doCheckin() {
   let result = await httpRequest(options(Api.checkin.url, '{}'));
   debug(result, "checkin");
   $.result += `签到：${fmtResult(result)}\n`;
-  if (isLoginPage(result)) $.prune = true;
+  if (isAuthError(result)) $.prune = true;
 }
 
 
@@ -225,7 +214,7 @@ async function doHarvest() {
     let body = JSON.stringify({ initData: "", slot: parseInt(slot, 10) });
     let result = await httpRequest(options(Api.harvest.url, body));
     debug(result, "harvest-" + slot);
-    if (isLoginPage(result)) { $.prune = true; break; }
+    if (isAuthError(result)) { $.prune = true; break; }
     let m = fmtResult(result);
     if (/成功|ok|已采|收获/i.test(m)) ok++; else fail++;
     msgs.push(`[${slot}]${m}`);
@@ -236,33 +225,20 @@ async function doHarvest() {
 }
 
 
-// 偷菜（按 STEAL_LIST 逐个偷）
-async function doSteal() {
-  let list = STEAL_LIST.split(',').map(s => s.trim()).filter(s => s !== '');
-  let ok = 0, fail = 0, msgs = [];
-  for (let item of list) {
-    let parts = item.split(':');
-    if (parts.length < 2) continue;
-    let victimId = parseInt(parts[0], 10), slot = parseInt(parts[1], 10);
-    let body = JSON.stringify({ initData: "", victimId: victimId, slot: slot });
-    let result = await httpRequest(options(Api.steal.url, body));
-    debug(result, "steal-" + victimId + "-" + slot);
-    if (isLoginPage(result)) { $.prune = true; break; }
-    let m = fmtResult(result);
-    if (/成功|ok|偷到|获得/i.test(m)) ok++; else fail++;
-    msgs.push(`[${victimId}:${slot}]${m}`);
-    await $.wait(1000 * 1);
-  }
-  $.result += `偷菜：成功 ${ok} 个，失败 ${fail} 个\n`;
-  if (msgs.length) $.result += msgs.join(' ') + '\n';
-}
-
-
-// 是否登录页（Cookie 过期）
-function isLoginPage(result) {
+// 是否登录过期/未登录（Cookie 失效，触发自动清理）
+// 覆盖两种情况：返回登录页 HTML，或接口 JSON 报 401/403/未登录/登录过期
+function isAuthError(result) {
   if (!result) return false;
   if (typeof result === 'string') {
-    return result.indexOf('/auth/login') !== -1 || result.indexOf('<html') !== -1;
+    return result.indexOf('/auth/login') !== -1 || result.indexOf('<html') !== -1
+      || /未登录|登录过期|登录失效|请先登录|请登录|token.*过期|身份过期|凭证过期|unauthorized/i.test(result);
+  }
+  if (typeof result === 'object') {
+    let code = result.code ?? result.status ?? result.errcode;
+    if (code === 401 || code === 403) return true;
+    let m = (result.message || result.msg || result.error || '') + '';
+    if (/未登录|登录过期|登录失效|请先登录|请登录|token.*过期|身份过期|凭证过期|unauthorized/i.test(m)) return true;
+    if (result.success === false && /登录|过期|失效|token/i.test(m)) return true;
   }
   return false;
 }
@@ -277,7 +253,7 @@ function fmtResult(result) {
     let raw = $.toStr(result) || '';
     return raw ? raw.slice(0, 80) : '请求失败或返回为空';
   } else if (typeof result === 'string' && result) {
-    if (result.indexOf('/auth/login') !== -1 || result.indexOf('<html') !== -1) return 'Cookie 已过期，请重新抓取';
+    if (isAuthError(result)) return 'Cookie 已过期，请重新抓取';
     return result.slice(0, 80);
   }
   return '请求失败或返回为空';
