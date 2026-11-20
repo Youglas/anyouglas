@@ -4,7 +4,7 @@
 # SOURCE: https://raw.githubusercontent.com/blackmatrix7/ios_rule_script/master/rule/Surge/Line/Line.list
 # UPDATED: 2025-06-06 (原版)
 # 用法（Quantumult X 配置 [filter_remote]）：
-# https://cdn.jsdelivr.net/gh/Youglas/anyouglas@COMMIT/line.list, tag=Line, force-policy=PROXY, enabled=true
+# https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d09bb16179f8a9d2b4521ce76b90a4ec01bac310/line.list, tag=Line, force-policy=PROXY, enabled=true
 
 host-suffix, lin.ee, PROXY
 host-suffix, line-apps.com, PROXY
