@@ -1,17 +1,17 @@
 /*
 脚本名称：cd 农场签到
 
-活动入口：cd.sd 农场（大姨子的诱惑）签到 + 采菜
+活动入口：cd.sd 农场（大姨子的诱惑）签到 + 采菜 + 种菜
 
-签到规则：每天 9:00 自动跑：签到 → 采菜（种菜待抓接口后补）
+签到规则：每天 9:00 自动跑：签到 → 采菜 → 种菜
 
 活动奖励：以网站返回为准
 
 环境变量：cd_cookie（QX 环境，多账号以@隔开）
 
-使用说明：添加重写规则后，在浏览器登录 cd.sd 并手动点一次签到/采菜即可获取 Cookie；任务每天 9:00 自动执行。采菜地块在 HARVEST_SLOTS 里改。过期 Cookie 自动清理（接口返回登录过期/未登录/401/403 时清理）。抓到 Cookie 后可删掉 cd 嗅探。
+使用说明：添加重写规则后，在浏览器登录 cd.sd 并手动点一次签到/采菜/种菜即可获取 Cookie；任务每天 9:00 自动执行。采菜/种菜地块在 HARVEST_SLOTS / PLANT_SLOTS 里改。过期 Cookie 自动清理（接口返回登录过期/未登录/401/403 时清理）。抓到 Cookie 后可删掉 cd 嗅探。
 
-更新时间：2026-11-20 (v2 去偷菜，修自动清 Cookie)
+更新时间：2026-11-20 (v3 加种菜)
 
 
 ================ Surge 配置 ================
@@ -23,9 +23,9 @@ hostname = %APPEND% cd.sd
 
 [Script]
 
-获取cd农场Cookie = type=http-request, pattern=^https:\/\/cd\.sd\/(api|farm\/api)\/.*, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@6f877735902a16f60df99f3596c56a94e2552c75/cd_farm_checkin.js
+获取cd农场Cookie = type=http-request, pattern=^https:\/\/cd\.sd\/(api|farm\/api)\/.*, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js
 
-cd农场签到 = type=cron, cronexp=0 9 * * *, timeout=120, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@6f877735902a16f60df99f3596c56a94e2552c75/cd_farm_checkin.js, script-update-interval=0
+cd农场签到 = type=cron, cronexp=0 9 * * *, timeout=120, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, script-update-interval=0
 
 
 ============ Quantumult X 配置 =============
@@ -37,12 +37,12 @@ hostname = %APPEND% cd.sd
 
 [rewrite_local]
 
-^https://cd\.sd/(api|farm/api)/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@6f877735902a16f60df99f3596c56a94e2552c75/cd_farm_checkin.js
+^https://cd\.sd/(api|farm/api)/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js
 
 
 [task_local]
 
-0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@6f877735902a16f60df99f3596c56a94e2552c75/cd_farm_checkin.js, tag=cd 农场签到, enabled=true
+0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, tag=cd 农场签到, enabled=true
 
 
 ================ Loon 配置 ================
@@ -51,9 +51,9 @@ hostname = %APPEND% cd.sd
 
 hostname = cd.sd
 
-cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@6f877735902a16f60df99f3596c56a94e2552c75/cd_farm_checkin.js, tag=cd 农场签到
+cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, tag=cd 农场签到
 
-http-request ^https://cd\.sd/(api|farm/api)/.* script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@6f877735902a16f60df99f3596c56a94e2552c75/cd_farm_checkin.js, requires-body=true, timeout=10, enabled=false, tag=获取cd农场Cookie
+http-request ^https://cd\.sd/(api|farm/api)/.* script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, requires-body=true, timeout=10, enabled=false, tag=获取cd农场Cookie
 
 */
 
@@ -80,6 +80,9 @@ let cookie = ($.isNode() ? process.env.cd_cookie : $.getdata(cd_cookie_key)) || 
 // 采菜地块（逗号隔开，按需改）
 const HARVEST_SLOTS = "0,1,2,3,4,5";
 
+// 种菜地块（逗号隔开，按需改）
+const PLANT_SLOTS = "0,1,2,3,4,5";
+
 
 // 统一管理 api 接口
 
@@ -93,6 +96,11 @@ const Api = {
   // 采菜
   "harvest": {
     "url": "/farm/api/harvest",
+  },
+
+  // 种菜
+  "plant": {
+    "url": "/farm/api/plant",
   }
 
 }
@@ -147,6 +155,9 @@ async function main() {
 
     // 采菜
     await doHarvest();
+
+    // 种菜
+    await doPlant();
 
     // 打印结果
     console.log($.result);
@@ -221,6 +232,24 @@ async function doHarvest() {
     await $.wait(1000 * 1);
   }
   $.result += `采菜：成功 ${ok} 块，失败 ${fail} 块\n`;
+  if (msgs.length) $.result += msgs.join(' ') + '\n';
+}
+
+// 种菜（按 PLANT_SLOTS 逐块种）
+async function doPlant() {
+  let slots = PLANT_SLOTS.split(',').map(s => s.trim()).filter(s => s !== '');
+  let ok = 0, fail = 0, msgs = [];
+  for (let slot of slots) {
+    let body = JSON.stringify({ initData: "", slot: parseInt(slot, 10) });
+    let result = await httpRequest(options(Api.plant.url, body));
+    debug(result, "plant-" + slot);
+    if (isAuthError(result)) { $.prune = true; break; }
+    let m = fmtResult(result);
+    if (/成功|ok|已种|种植|种下/i.test(m)) ok++; else fail++;
+    msgs.push(`[${slot}]${m}`);
+    await $.wait(1000 * 1);
+  }
+  $.result += `种菜：成功 ${ok} 块，失败 ${fail} 块\n`;
   if (msgs.length) $.result += msgs.join(' ') + '\n';
 }
 
