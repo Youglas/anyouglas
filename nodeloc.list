@@ -1,0 +1,6 @@
+# NodeLoc 分流规则集
+# 将 NodeLoc 论坛（网站 + App）流量走代理
+# 引用方式（Quantumult X 配置 [filter_remote]）：
+# https://cdn.jsdelivr.net/gh/Youglas/anyouglas@COMMIT/nodeloc.list, tag=NodeLoc, force-policy=PROXY, enabled=true
+
+host-suffix, nodeloc.com, PROXY
