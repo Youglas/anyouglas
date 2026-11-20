@@ -23,9 +23,9 @@ hostname = %APPEND% cd.sd
 
 [Script]
 
-获取cd农场Cookie = type=http-request, pattern=^https:\/\/cd\.sd\/(api|farm\/api)\/.*, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js
+获取cd农场Cookie = type=http-request, pattern=^https:\/\/cd\.sd\/(api|farm\/api)\/.*, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d007dafeb10c2a96539ce40642f4185aa71f97ce/cd_farm_checkin.js
 
-cd农场签到 = type=cron, cronexp=0 9 * * *, timeout=120, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, script-update-interval=0
+cd农场签到 = type=cron, cronexp=0 9 * * *, timeout=120, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d007dafeb10c2a96539ce40642f4185aa71f97ce/cd_farm_checkin.js, script-update-interval=0
 
 
 ============ Quantumult X 配置 =============
@@ -37,12 +37,12 @@ hostname = %APPEND% cd.sd
 
 [rewrite_local]
 
-^https://cd\.sd/(api|farm/api)/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js
+^https://cd\.sd/(api|farm/api)/.* url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d007dafeb10c2a96539ce40642f4185aa71f97ce/cd_farm_checkin.js
 
 
 [task_local]
 
-0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, tag=cd 农场签到, enabled=true
+0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d007dafeb10c2a96539ce40642f4185aa71f97ce/cd_farm_checkin.js, tag=cd 农场签到, enabled=true
 
 
 ================ Loon 配置 ================
@@ -51,9 +51,9 @@ hostname = %APPEND% cd.sd
 
 hostname = cd.sd
 
-cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, tag=cd 农场签到
+cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d007dafeb10c2a96539ce40642f4185aa71f97ce/cd_farm_checkin.js, tag=cd 农场签到
 
-http-request ^https://cd\.sd/(api|farm/api)/.* script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@MASTER/cd_farm_checkin.js, requires-body=true, timeout=10, enabled=false, tag=获取cd农场Cookie
+http-request ^https://cd\.sd/(api|farm/api)/.* script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d007dafeb10c2a96539ce40642f4185aa71f97ce/cd_farm_checkin.js, requires-body=true, timeout=10, enabled=false, tag=获取cd农场Cookie
 
 */
 
