@@ -17,7 +17,7 @@
 
 [task_local]
 
-0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@COMMIT/yuchen_checkin.js, tag=雨晨签到, enabled=true
+0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@ab39b73a2839770fc1f116e43b1dfa1a09399fcc/yuchen_checkin.js, tag=雨晨签到, enabled=true
 
 */
 
