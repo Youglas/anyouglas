@@ -18,7 +18,7 @@ v2 改动：去掉远程通知校验和无用代码；一个账号失败不影�
 
 [task_local]
 
-0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@COMMIT/yuchenios_v2.js, tag=雨晨签到, enabled=true
+0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@d327c3fe6bac4b027b5b86f611c0b138fa269fe2/yuchenios_v2.js, tag=雨晨签到, enabled=true
 
 */
 
