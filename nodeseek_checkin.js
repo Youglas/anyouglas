@@ -12,6 +12,49 @@ NodeSeek签到
 使用说明：添加重写规则后，在 Safari 打开 nodeseek.com 登录并手动点一次签到即可获取 Cookie；任务每天 9:00 自动执行。遇到 Cloudflare 验证拦截时，脚本会直接提示，不会再报 JSON 解析错误；此时在浏览器里过一次验证后重新抓 Cookie 即可。过期 Cookie 自动清理。
 
 更新时间：2026-11-26
+
+
+================ Surge 配置 ================
+
+[MITM]
+
+hostname = %APPEND% www.nodeseek.com
+
+
+[Script]
+
+获取NS Cookie = type=http-request, pattern=^https:\/\/www\.nodeseek\.com\/api\/attendance, requires-body=1, max-size=0, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@07a7ecf66002f5fb3006fec58c8e77241223af4e/nodeseek_checkin.js
+
+NS签到 = type=cron, cronexp=0 9 * * *, timeout=60, script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@07a7ecf66002f5fb3006fec58c8e77241223af4e/nodeseek_checkin.js, script-update-interval=0
+
+
+============ Quantumult X 配置 =============
+
+[MITM]
+
+hostname = %APPEND% www.nodeseek.com
+
+
+[rewrite_local]
+
+^https:\/\/www\.nodeseek\.com\/api\/attendance url script-request-body https://cdn.jsdelivr.net/gh/Youglas/anyouglas@07a7ecf66002f5fb3006fec58c8e77241223af4e/nodeseek_checkin.js
+
+
+[task_local]
+
+0 9 * * * https://cdn.jsdelivr.net/gh/Youglas/anyouglas@07a7ecf66002f5fb3006fec58c8e77241223af4e/nodeseek_checkin.js, tag=NS签到, enabled=true
+
+
+================ Loon 配置 ================
+
+[MITM]
+
+hostname = www.nodeseek.com
+
+cron "0 9 * * *" script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@07a7ecf66002f5fb3006fec58c8e77241223af4e/nodeseek_checkin.js, tag=NS签到
+
+http-request ^https:\/\/www\.nodeseek\.com\/api\/attendance script-path=https://cdn.jsdelivr.net/gh/Youglas/anyouglas@07a7ecf66002f5fb3006fec58c8e77241223af4e/nodeseek_checkin.js, requires-body=true, timeout=10, enabled=false, tag=获取NS Cookie
+
 */
 
 
